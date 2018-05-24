@@ -118,7 +118,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="debug_logger.hpp" />
     <ClInclude Include="Deck.h" />
     <ClInclude Include="KlondikeSolver.h" />
     <ClInclude Include="Card.h" />
