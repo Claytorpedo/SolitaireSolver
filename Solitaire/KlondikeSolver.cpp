@@ -488,5 +488,8 @@ GameResult KlondikeSolver::Solve() {
 	u32 depth = 0;
 	GameResult::Result r = _solve_recursive(depth);
 
+	if (r == GameResult::Result::UNKNOWN || r == GameResult::Result::LOSE)
+		move_sequence_.clear();
+
 	return GameResult{ states_tried_, game_.seed, move_sequence_, r };
 }
