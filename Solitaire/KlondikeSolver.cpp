@@ -410,7 +410,7 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 		return GameResult::Result::WIN;
 
 	if (states_tried_ != 0 && states_tried_ >= maxStates)
-		return GameResult::Result::UNKNOWN; // Run out of allowed states to try.
+		return GameResult::Result::UNKNOWN; // Ran out of allowed states to try.
 
 	if (_find_available_moves(availableMoves)) {
 		for (auto m : availableMoves) {
