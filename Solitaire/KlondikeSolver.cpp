@@ -4,7 +4,6 @@
 #include <iostream>
 #include <string>
 
-#include "debug_logger.hpp"
 #include "units.h"
 
 using namespace Solitaire;
@@ -310,7 +309,7 @@ void KlondikeSolver::_find_full_run_moves(MoveList& availableMoves) {
 		const Pile& fromPile = game_.tableau[i];
 		const Card* card;
 		u8 runLength;
-		if (!_find_top_of_run(fromPile, runLength, &card) || runLength == fromPile.size())
+		if (!_find_top_of_run(fromPile, runLength, &card) || (runLength == fromPile.size() && card->getRank() == RANK_KING))
 			continue; // Empty pile or King in empty space.
 		// Find a place to move the card to. Only take first place if there are multiple.
 		u8 toPile;
@@ -365,10 +364,10 @@ void KlondikeSolver::_find_stock_moves(MoveList& availableMoves) {
 
 bool KlondikeSolver::_find_available_moves(MoveList& availableMoves) {
 	// Order here sets priority.
-	_find_foundation_moves(availableMoves);
 	_find_full_run_moves(availableMoves);
-	_find_stock_moves(availableMoves);
 	_find_partial_run_moves(availableMoves);
+	_find_stock_moves(availableMoves);
+	_find_foundation_moves(availableMoves);
 
 	if (_is_stock_dirty()) // If we can shuffle the stock, do so last.
 		availableMoves.push_back(Move::RepileStock(game_.stock[stock_position_], stock_position_));
@@ -396,7 +395,7 @@ void KlondikeSolver::_init() {
 	_repile_stock();
 }
 
-bool KlondikeSolver::_solve_recursive(u32 depth) {
+GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 	MoveList autoMoves, tempAutoMoves, availableMoves;
 
 	while (_find_auto_moves(tempAutoMoves)) {
@@ -408,29 +407,19 @@ bool KlondikeSolver::_solve_recursive(u32 depth) {
 	}
 
 	if (game_.isGameWon())
-		return true;
+		return GameResult::Result::WIN;
 
-	moves_tried_ += autoMoves.size();
+	if (states_tried_ != 0 && states_tried_ >= maxStates)
+		return GameResult::Result::UNKNOWN; // Run out of allowed states to try.
 
 	if (_find_available_moves(availableMoves)) {
 		for (auto m : availableMoves) {
 			_do_move(m);
-			++moves_tried_;
+			++states_tried_;
 
-#ifdef DEBUG
-			//game_.printGame();
-			//std::cin.ignore();
-#endif
-
-			//std::cout << "Move: " << toUType(m.type) << "  " << RankToStr(m.movedCard.getRank()) << SuitToChar(m.movedCard.getSuit()) << "\n";
-
-			if ( (moves_tried_ & 1048575) == 0 )
-				std::cout << '\r' << "Moves tried: " << moves_tried_ << " depth: " << depth << "               ";
-
-			if (_solve_recursive(depth + 1))
-				return true;
-
-			//DBG_LOG("Undoing move...");
+			GameResult::Result r = _solve_recursive(depth + 1);
+			if (r != GameResult::Result::LOSE)
+				return r;
 
 			_undo_move(m);
 		}
@@ -439,7 +428,7 @@ bool KlondikeSolver::_solve_recursive(u32 depth) {
 	for (std::size_t i = autoMoves.size(); i != 0; )
 		_undo_move(autoMoves[--i]);
 
-	return false;
+	return GameResult::Result::LOSE;
 }
 
 void KlondikeSolver::_do_move(const Move& m) {
@@ -493,19 +482,11 @@ void KlondikeSolver::_undo_move(const Move& m) {
 	}
 }
 
-MoveList KlondikeSolver::Solve() {
+GameResult KlondikeSolver::Solve() {
 	_init();
 
-	game_.printGame();
-
-	std::cout << moves_tried_;
 	u32 depth = 0;
-	std::cout << (_solve_recursive(depth) ? "\n\nwin" : "\n\nlose") << "\n";
-	game_.printGame();
+	GameResult::Result r = _solve_recursive(depth);
 
-	std::cout << "Moves tried: " << moves_tried_ << "\n";
-
-	std::cin.ignore();
-
-	return move_sequence_;
+	return GameResult{ states_tried_, game_.seed, move_sequence_, r };
 }

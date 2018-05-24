@@ -53,13 +53,13 @@ namespace Solitaire {
 		static constexpr u8 NUM_FOUNDATION_PILES = static_cast<u8>(Suit::TOTAL_SUITS);
 		static constexpr u8 NUM_STOCK_CARD_DRAW = 3; // Number of cards to deal from the stock at a time.
 
-		const u32 seed = 0;
+		const u64 seed = 0;
 
 		std::vector<Pile> tableau{ NUM_TABLEAU_PILES, Pile(PileType::TABLEAU) };
 		std::vector<Pile> foundation{ NUM_FOUNDATION_PILES, Pile(PileType::FOUNDATION) };
 		Pile stock{PileType::STOCK};
 
-		KlondikeGame(u32 seed) : seed(seed) {}
+		KlondikeGame(u64 seed) : seed(seed) {}
 
 		void setUpGame();
 		void printGame() const;
@@ -68,12 +68,26 @@ namespace Solitaire {
 		bool isGameWon() const;
 	};
 
+	struct GameResult {
+		enum class Result {
+			WIN,
+			LOSE,
+			UNKNOWN,
+		};
+		const u64 positionsTried;
+		const u64 seed;
+		const MoveList solution;
+		const Result result;
+	};
+
 	class KlondikeSolver {
 	public:
-		KlondikeSolver(u32 seed) : game_(seed) {};
-		KlondikeSolver(KlondikeGame game) : game_(game) {};
+		const u64 maxStates = 0; // Max states == 0 -> search until solved.
 
-		MoveList Solve();
+		KlondikeSolver(u64 seed, u64 maxStates = 0) : game_(seed), maxStates(maxStates)  {};
+		KlondikeSolver(KlondikeGame game, u64 maxStates = 0) : game_(game), maxStates(maxStates) {};
+
+		GameResult Solve();
 
 	private:
 		void _init();
@@ -84,7 +98,7 @@ namespace Solitaire {
 		// Is if a card is available for a move.
 		bool _is_card_available(const Card& cardToFind) const;
 		// Returns true if the game has been won.
-		bool _solve_recursive(u32 depth);
+		GameResult::Result _solve_recursive(u32 depth);
 
 		void _do_move(const Move& m);
 		void _undo_move(const Move& m);
@@ -109,6 +123,6 @@ namespace Solitaire {
 
 		Deck partial_run_move_cards_; // Keeps track of partial run moves, to stop cards from being moved back and forth.
 
-		u64 moves_tried_ = 0;
+		u64 states_tried_ = 0;
 	};
 }

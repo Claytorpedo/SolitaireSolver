@@ -12,7 +12,7 @@ namespace Solitaire {
 
 	using Deck = std::vector<Card>;
 
-	Deck GenDeck(u32 deckSeed, u8 numDecks = 1);
+	Deck GenDeck(u64 deckSeed, u8 numDecks = 1);
 	
 	enum class PileType {
 		NONE,

@@ -21,7 +21,7 @@ namespace Solitaire {
 		from.deck_.erase(from.deck_.begin() + fromPosition);
 	}
 
-	Deck GenDeck(u32 deckSeed, u8 numDecks) {
+	Deck GenDeck(u64 deckSeed, u8 numDecks) {
 		Suit suit;
 		const u32 numCards(numDecks * CARDS_PER_DECK);
 		Deck deck;
@@ -35,7 +35,7 @@ namespace Solitaire {
 			}
 		}
 
-		std::mt19937 rng;
+		std::mt19937_64 rng;
 		rng.seed(deckSeed);
 
 		for (u32 i = numCards - 1; i > 0; --i) {
