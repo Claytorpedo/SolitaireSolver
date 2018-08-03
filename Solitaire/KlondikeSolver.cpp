@@ -1,6 +1,7 @@
 #include "KlondikeSolver.h"
 
 #include <algorithm>
+#include <climits>
 #include <iostream>
 #include <string>
 
@@ -45,6 +46,24 @@ namespace {
 	const char* const BORDER     = "----------------------------------------------------------------\n";
 
 	const Solitaire::u8 CARD_HEIGHT = 4;
+
+	void _concat_pile_str(const Pile& pile, std::string& string ) {
+		const u8 size = pile.size();
+		for (u8 i = 0; i < size; ++i)
+			string.push_back(static_cast<char>((toUType(pile[i].getSuit()) * CARDS_PER_SUIT) + pile[i].getRank()));
+	}
+	// Make a unique string id to represent a board state (not human readable).
+	std::string _get_unique_state_id(const KlondikeGame& game, bool isStockDirty) {
+		std::string id;
+		id.reserve(CARDS_PER_DECK + 1);
+		id.push_back(isStockDirty ? '1' : '0');
+		for (const Pile& pile : game.tableau)
+			_concat_pile_str(pile, id);
+		for (const Pile& pile : game.foundation)
+			_concat_pile_str(pile, id);
+		_concat_pile_str(game.stock, id);
+		return id;
+	}
 }
 
 void KlondikeGame::setUpGame() {
@@ -59,14 +78,13 @@ void KlondikeGame::setUpGame() {
 void KlondikeGame::printGame() const {
 	std::cout << BORDER;
 
-	// Print stock, waste, and foundations.
-
 	// Print stock as a string of entries.
 	std::cout << "stock: ";
-	for (u32 i = 0; i < stock.size(); ++i)
+	for (u8 i = 0; i < stock.size(); ++i)
 		std::cout << RankToStr(stock[i].getRank()) << SuitToChar(stock[i].getSuit()) << ", ";
 	std::cout << "\n";
 
+	// Print foundation.
 	for (u8 i = 0; i < CARD_HEIGHT; ++i) {
 		for (u8 k = 0; k < NUM_FOUNDATION_PILES; ++k) {
 			if (!foundation[k].hasCards()) {
@@ -90,10 +108,10 @@ void KlondikeGame::printGame() const {
 
 	// Print tableau.
 	bool printedSomething = true;
-	const u8 halfHeight = static_cast<u16>(CARD_HEIGHT * 0.5f);
+	const u8 halfHeight = static_cast<u8>(CARD_HEIGHT * 0.5f);
 	for (u16 i = 0; printedSomething; ++i) {
-		const u16 cardIndex = static_cast<u16>(i / halfHeight);
-		const u8 cardDrawIndex = i % halfHeight;
+		const u8 cardIndex = static_cast<u8>(i / halfHeight);
+		const u8 cardDrawIndex = static_cast<u8>(i % halfHeight);
 		printedSomething = false;
 		for (u8 k = 0; k < NUM_TABLEAU_PILES; ++k) {
 			if (!tableau[k].hasCards() || tableau[k].size() < cardIndex) {
@@ -375,6 +393,14 @@ bool KlondikeSolver::_find_available_moves(MoveList& availableMoves) {
 	return !availableMoves.empty();
 }
 
+bool KlondikeSolver::_is_seen_state() {
+	const std::string uniqueId(_get_unique_state_id(game_, _is_stock_dirty()));
+	if (seen_states_.count(uniqueId))
+		return true;
+	seen_states_.insert(uniqueId);
+	return false;
+}
+
 bool KlondikeSolver::_is_stock_dirty() const {
 	if (!game_.stock.hasCards())
 		return false; // No cards left.
@@ -393,9 +419,13 @@ void KlondikeSolver::_repile_stock() {
 void KlondikeSolver::_init() {
 	game_.setUpGame();
 	_repile_stock();
+	seen_states_.reserve( static_cast<unsigned int>(std::min(maxStates, static_cast<Solitaire::u64>(seen_states_.max_size()))));
 }
 
 GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
+	if (_is_seen_state())
+		return GameResult::Result::LOSE;
+
 	MoveList autoMoves, tempAutoMoves, availableMoves;
 
 	while (_find_auto_moves(tempAutoMoves)) {

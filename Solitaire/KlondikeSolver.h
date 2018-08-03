@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_set>
+#include <string>
 #include <vector>
 
 #include "units.h"
@@ -27,7 +29,7 @@ namespace Solitaire {
 		const PileID toPile;
 		union {
 			const u8 cardsToMove;
-			const u8 stockPosition; // If STOCK_MOVE or SHUFFLE_STOCK, indicates pre-move position.
+			const u8 stockPosition; // If STOCK_MOVE or REPILE_STOCK, indicates pre-move position.
 		};
 		const u8 stockMovePosition = 0; // If STOCK_MOVE, indicates position in stock to move from.
 		const MoveType type;
@@ -45,7 +47,6 @@ namespace Solitaire {
 			: movedCard(movedCard), fromPile(fromPile), toPile(toPile), stockPosition(stockPosition), stockMovePosition(stockMovePosition), type(type) {}
 	};
 
-	class Move;
 	using MoveList = std::vector<Move>;
 
 	struct KlondikeGame {
@@ -117,6 +118,8 @@ namespace Solitaire {
 		// Returns true if any available moves were found.
 		bool _find_available_moves(MoveList& availableMoves);
 
+		bool _is_seen_state();
+
 		KlondikeGame game_;
 		u8 stock_position_;
 		MoveList move_sequence_;
@@ -124,5 +127,6 @@ namespace Solitaire {
 		Deck partial_run_move_cards_; // Keeps track of partial run moves, to stop cards from being moved back and forth.
 
 		u64 states_tried_ = 0;
+		std::unordered_set<std::string> seen_states_;
 	};
 }

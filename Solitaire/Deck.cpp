@@ -5,7 +5,7 @@
 #include "Card.h"
 
 namespace Solitaire {
-	void Pile::MoveCards(Pile& from, Pile& to, u32 numCards) {
+	void Pile::MoveCards(Pile& from, Pile& to, u8 numCards) {
 		const auto start(from.deck_.end() - numCards);
 		to.deck_.insert(to.deck_.end(), std::make_move_iterator(start), std::make_move_iterator(from.deck_.end()));
 		from.deck_.erase(start, from.deck_.end());
@@ -13,11 +13,11 @@ namespace Solitaire {
 
 	void Pile::MoveCard(Pile& from, s32 fromPosition, Pile& to, s32 toPosition) {
 		if (fromPosition < 0)
-			fromPosition = from.deck_.size() - 1;
+			fromPosition = static_cast<s32>(from.deck_.size() - 1);
 		if (toPosition < 0)
-			to.deck_.push_back(from[static_cast<u32>(fromPosition)]);
+			to.deck_.push_back(from[static_cast<u8>(fromPosition)]);
 		else
-			to.deck_.insert(to.deck_.begin() + toPosition, from[static_cast<u32>(fromPosition)]);
+			to.deck_.insert(to.deck_.begin() + toPosition, from[static_cast<u8>(fromPosition)]);
 		from.deck_.erase(from.deck_.begin() + fromPosition);
 	}
 
