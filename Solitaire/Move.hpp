@@ -22,6 +22,7 @@ namespace solitaire {
 		case(MoveType::STOCK):           return "STOCK";
 		case(MoveType::REPILE_STOCK):    return "REPILE_STOCK";
 		}
+		return "?";
 	}
 
 	class Move { // Holds information for a move, as well as what's needed to undo that move.
