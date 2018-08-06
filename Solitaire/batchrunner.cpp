@@ -21,8 +21,6 @@ namespace {
 	const std::string UNKNOWN_FILE = RESULTS_DIR + "unknown_seeds.txt";
 	const unsigned int SEED_PADDING = 16; // Zero padding for output to files.
 
-
-
 	bool _startup() {
 		if (_mkdir(RESULTS_DIR.c_str()) != 0) {
 			std::cerr << "Failed to create results directory./n";
@@ -37,7 +35,7 @@ namespace {
 
 	void _write_solution_file(const GameResult& result) {
 		std::stringstream fileName;
-		fileName << SOLUTIONS_DIR << std::setfill('0') << std::setw(SEED_PADDING) << ".txt";
+		fileName << SOLUTIONS_DIR << std::setfill('0') << std::setw(SEED_PADDING) << result.seed << ".txt";
 		std::ofstream solutionFile(fileName.str(), std::ios::trunc);
 
 		// Print off moves list.
@@ -54,7 +52,7 @@ namespace {
 		for (const Move& move : result.solution) {
 			KlondikeSolver::doMove(game, move);
 			game.printGame(solutionFile);
-			solutionFile << "Move: ";
+			solutionFile << MoveToStr(move) << "\n";
 		}
 	}
 
@@ -84,17 +82,22 @@ namespace {
 }
 
 bool batchrunner::run() {
-	//startup();
+	if (!_startup())
+		return false;
 
-	for (u32 i = 0; i < 10000000; ++i) {
+	std::vector<GameResult> results;
+	results.reserve(100);
+	for (u32 i = 0; i < 100; ++i) {
 		KlondikeSolver solver(i, 5000000);
-		GameResult result = solver.Solve();
+		const GameResult result = solver.Solve();
+		results.push_back(result);
 		std::cout << "************************************************************************\n";
 		std::cout << "Seed: " << result.seed << " is " << (result.result == GameResult::Result::WIN ? "win" : result.result == GameResult::Result::LOSE ? "loss" : "unknown") << "\n";
 		if (result.result != GameResult::Result::UNKNOWN) {
 			std::cout << "num moves: " << result.positionsTried << "\n";
 		}
 	}
+	_write_results(results);
 
 	return true;
 }

@@ -12,6 +12,7 @@
 
 # Build results
 UnitTest/
+[Rr]esults/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
