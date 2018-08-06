@@ -24,14 +24,6 @@ namespace solitaire {
 		}
 	}
 
-	inline std::string MoveToStr(const Move& m) {
-		std::string moveStr = MoveTypeToStr(m.type);
-		if (m.type != MoveType::REPILE_STOCK) {
-			moveStr += " " + CardToStr(m.movedCard);
-		}
-		return moveStr;
-	}
-
 	class Move { // Holds information for a move, as well as what's needed to undo that move.
 	public:
 		const Card movedCard;
@@ -58,4 +50,12 @@ namespace solitaire {
 	};
 
 	using MoveList = std::vector<Move>;
+
+	inline std::string MoveToStr(const Move& m) {
+		std::string moveStr = MoveTypeToStr(m.type);
+		if (m.type != MoveType::REPILE_STOCK) {
+			moveStr += " " + CardToStr(m.movedCard);
+		}
+		return moveStr;
+	}
 }
