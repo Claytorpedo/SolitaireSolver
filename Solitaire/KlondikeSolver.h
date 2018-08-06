@@ -22,23 +22,23 @@ namespace Solitaire {
 		REPILE_STOCK,
 	};
 
-	class Move {
+	class Move { // Holds information for a move, as well as what's needed to undo that move.
 	public:
 		const Card movedCard;
 		const PileID fromPile;
 		const PileID toPile;
 		union {
 			const u8 cardsToMove;
-			const u8 stockPosition; // If STOCK_MOVE or REPILE_STOCK, indicates pre-move position.
+			const u8 stockPosition; // If type is STOCK or REPILE_STOCK, indicates pre-move position.
 		};
-		const u8 stockMovePosition = 0; // If STOCK_MOVE, indicates position in stock to move from.
+		const u8 stockMovePosition = 0; // If type is STOCK, indicates position in stock to move from.
 		const MoveType type;
 		const bool flippedCard = false; // Whether the move caused a card to be flipped.
 
 		static Move TableauPartial(const Card& movedCard, PileID fromPile, PileID toPile, u8 cardsToMove); // Move a partial run.
 		static Move Tableau(const Card& movedCard, PileID fromPile, PileID toPile, u8 cardsToMove, bool flippedCard);  // Move one or more cards from a tableau pile to another pile.
 		static Move Stock(const Card& movedCard, u8 stockPosition, u8 stockMovePosition, PileID toPile); // Move a card from the stock pile to another pile.
-		static Move RepileStock(const Card& movedCard, u8 stockPosition); // Re-pile/reset the stock.
+		static Move RepileStock(u8 stockPosition); // Repile/reset the stock.
 
 	private:
 		explicit Move(const Card& movedCard, PileID fromPile, PileID toPile, u8 cardsToMove, MoveType type, bool flippedCard)
@@ -49,24 +49,39 @@ namespace Solitaire {
 
 	using MoveList = std::vector<Move>;
 
-	struct KlondikeGame {
+	class KlondikeGame {
+	public:
 		static constexpr u8 NUM_TABLEAU_PILES = 7;
 		static constexpr u8 NUM_FOUNDATION_PILES = static_cast<u8>(Suit::TOTAL_SUITS);
 		static constexpr u8 NUM_STOCK_CARD_DRAW = 3; // Number of cards to deal from the stock at a time.
 
 		const u64 seed = 0;
 
-		std::vector<Pile> tableau{ NUM_TABLEAU_PILES, Pile(PileType::TABLEAU) };
-		std::vector<Pile> foundation{ NUM_FOUNDATION_PILES, Pile(PileType::FOUNDATION) };
-		Pile stock{PileType::STOCK};
-
 		KlondikeGame(u64 seed) : seed(seed) {}
 
 		void setUpGame();
-		void printGame() const;
-		Pile& getPile(const PileID& id);
+
+		Pile&       getPile(const PileID& id);
 		const Pile& getPile(const PileID& id) const;
+
+		u8   getStockPosition() const { return stock_position_; }
+		void setStockPosition(u8 position) { stock_position_ = position; }
+
 		bool isGameWon() const;
+		bool isStockDirty() const; // Whether the stock can be repiled (stock position is not pointing to the first available card).
+		void repileStock(); // Equivalent to dealing all of stock to waste, and then back to stock.
+
+		void printGame() const;
+
+		std::string getUniqueStateID() const;
+
+	public:
+		std::vector<Pile> tableau{ NUM_TABLEAU_PILES, Pile(PileType::TABLEAU) };
+		std::vector<Pile> foundation{ NUM_FOUNDATION_PILES, Pile(PileType::FOUNDATION) };
+		Pile stock{ PileType::STOCK };
+
+	private:
+		u8 stock_position_;
 	};
 
 	struct GameResult {
@@ -90,12 +105,11 @@ namespace Solitaire {
 
 		GameResult Solve();
 
+	public:
+		static void doMove(KlondikeGame& game, const Move& move);
+
 	private:
 		void _init();
-		// Equivalent to dealing all of stock to waste, and then back to stock.
-		void _repile_stock();
-		// Returns true if the stock position is not at the first available card in the stock pile.
-		bool _is_stock_dirty() const;
 		// Is if a card is available for a move.
 		bool _is_card_available(const Card& cardToFind) const;
 		// Returns true if the game has been won.
@@ -121,7 +135,6 @@ namespace Solitaire {
 		bool _is_seen_state();
 
 		KlondikeGame game_;
-		u8 stock_position_;
 		MoveList move_sequence_;
 
 		Deck partial_run_move_cards_; // Keeps track of partial run moves, to stop cards from being moved back and forth.

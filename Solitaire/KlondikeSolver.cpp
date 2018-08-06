@@ -9,7 +9,6 @@
 
 using namespace Solitaire;
 
-
 // ---------------------------------- Move ----------------------------------
 Move Move::TableauPartial(const Card& movedCard, PileID fromPile, PileID toPile, u8 cardsToMove) {
 	return Move(movedCard, fromPile, toPile, cardsToMove, MoveType::TABLEAU_PARTIAL, false);
@@ -20,10 +19,9 @@ Move Move::Tableau(const Card& movedCard, PileID fromPile, PileID toPile, u8 car
 Move Move::Stock(const Card& movedCard, u8 stockPosition, u8 stockMovePosition, PileID toPile) {
 	return Move(movedCard, PileID{ PileType::STOCK }, toPile, stockPosition, stockMovePosition, MoveType::STOCK);
 }
-Move Move::RepileStock(const Card& movedCard, u8 stockPosition) {
-	return Move(movedCard, PileID{}, PileID{}, stockPosition, 0, MoveType::REPILE_STOCK);
+Move Move::RepileStock(u8 stockPosition) {
+	return Move(Card{}, PileID{}, PileID{}, stockPosition, 0, MoveType::REPILE_STOCK);
 }
-
 
 // ------------------------------ Klondike Game ------------------------------
 namespace {
@@ -52,18 +50,6 @@ namespace {
 		for (u8 i = 0; i < size; ++i)
 			string.push_back(static_cast<char>((toUType(pile[i].getSuit()) * CARDS_PER_SUIT) + pile[i].getRank()));
 	}
-	// Make a unique string id to represent a board state (not human readable).
-	std::string _get_unique_state_id(const KlondikeGame& game, bool isStockDirty) {
-		std::string id;
-		id.reserve(CARDS_PER_DECK + 1);
-		id.push_back(isStockDirty ? '1' : '0');
-		for (const Pile& pile : game.tableau)
-			_concat_pile_str(pile, id);
-		for (const Pile& pile : game.foundation)
-			_concat_pile_str(pile, id);
-		_concat_pile_str(game.stock, id);
-		return id;
-	}
 }
 
 void KlondikeGame::setUpGame() {
@@ -73,6 +59,72 @@ void KlondikeGame::setUpGame() {
 		for (u8 k = 0; k < i; ++k)
 			tableau[i][k].flipCard(); // Flip all but the topmost card.
 	}
+	repileStock();
+}
+
+const Pile& KlondikeGame::getPile(const PileID& id) const {
+	switch (id.type) {
+	case PileType::STOCK:
+		return stock;
+	case PileType::FOUNDATION:
+		return foundation[id.index];
+	case PileType::TABLEAU:
+		return tableau[id.index];
+	default:
+		std::cerr << "Error: Invalid pile type for Klondike. (type: " << static_cast<u32>(id.type) << ")";
+		return stock;
+	}
+}
+
+Pile& KlondikeGame::getPile(const PileID& id) {
+	return const_cast<Pile&>(std::as_const(*this).getPile(id));
+}
+
+bool KlondikeGame::isGameWon() const {
+	if (stock.hasCards())
+		return false;
+	for (u8 i = 0; i < NUM_TABLEAU_PILES; ++i) {
+		if (tableau[i].hasCards())
+			return false;
+	}
+	for (u8 i = 0; i < NUM_FOUNDATION_PILES; ++i) {
+		if (foundation[i].size() != CARDS_PER_SUIT)
+			return false;
+		for (Rank k = 0; k < CARDS_PER_SUIT; ++k) {
+			const Card& c = foundation[i][k];
+			if (c.getRank() != (k + 1) || c.getSuit() != Suit(i))
+				return false;
+		}
+	}
+	return true;
+}
+
+bool KlondikeGame::isStockDirty() const {
+	if (!stock.hasCards())
+		return false; // No cards left.
+	if (stock_position_ == KlondikeGame::NUM_STOCK_CARD_DRAW - 1)
+		return false; // At default position.
+	if (stock_position_ < KlondikeGame::NUM_STOCK_CARD_DRAW && stock_position_ == stock.size() - 1)
+		return false; // Not enough cards left for a single stock draw.
+	return true;
+}
+
+void KlondikeGame::repileStock() {
+	// This can cause overflow when we are out of cards, but is safe because we can never use stock_position_ without checking if the stock is empty anyway.
+	stock_position_ = stock.size() < KlondikeGame::NUM_STOCK_CARD_DRAW ? stock.size() - 1 : KlondikeGame::NUM_STOCK_CARD_DRAW - 1;
+}
+
+std::string KlondikeGame::getUniqueStateID() const {
+	// Make a unique string id to represent a board state (not human readable).
+		std::string id;
+		id.reserve(CARDS_PER_DECK + 1);
+		id.push_back(isStockDirty() ? '1' : '0');
+		for (const Pile& pile : tableau)
+			_concat_pile_str(pile, id);
+		for (const Pile& pile : foundation)
+			_concat_pile_str(pile, id);
+		_concat_pile_str(stock, id);
+		return id;
 }
 
 void KlondikeGame::printGame() const {
@@ -139,43 +191,6 @@ void KlondikeGame::printGame() const {
 	}
 
 	std::cout << BORDER;
-}
-
-const Pile& KlondikeGame::getPile(const PileID& id) const {
-	switch (id.type) {
-	case PileType::STOCK:
-		return stock;
-	case PileType::FOUNDATION:
-		return foundation[id.index];
-	case PileType::TABLEAU:
-		return tableau[id.index];
-	default:
-		std::cerr << "Error: Invalid pile type for Klondike. (type: " << static_cast<u32>(id.type) << ")";
-		return stock;
-	}
-}
-
-Pile& KlondikeGame::getPile(const PileID& id) {
-	return const_cast<Pile&>(std::as_const(*this).getPile(id));
-}
-
-bool KlondikeGame::isGameWon() const {
-	if (stock.hasCards())
-		return false;
-	for (u8 i = 0; i < NUM_TABLEAU_PILES; ++i) {
-		if (tableau[i].hasCards())
-			return false;
-	}
-	for (u8 i = 0; i < NUM_FOUNDATION_PILES; ++i) {
-		if (foundation[i].size() != CARDS_PER_SUIT)
-			return false;
-		for (Rank k = 0; k < CARDS_PER_SUIT; ++k) {
-			const Card& c = foundation[i][k];
-			if (c.getRank() != (k + 1) || c.getSuit() != Suit(i))
-				return false;
-		}
-	}
-	return true;
 }
 
 // ----------------------------- Klondike Solver -----------------------------
@@ -270,7 +285,7 @@ bool KlondikeSolver::_is_card_available(const Card& cardToFind) const {
 		if (cardToFind == game_.tableau[i].getFromTop())
 			return true;
 	}
-	for (u8 i = stock_position_; i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
+	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
 		if (cardToFind == game_.stock[i])
 			return true;
 	}
@@ -315,10 +330,10 @@ void KlondikeSolver::_find_foundation_moves(MoveList& availableMoves) {
 			availableMoves.push_back(Move::Tableau(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }, 1, flippedCard));
 		}
 	}
-	for (u8 i = stock_position_; i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
+	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
 		const Card& c = game_.stock[i];
 		if (_can_move_to_foundation(c, game_.foundation))
-			availableMoves.push_back(Move::Stock(c, stock_position_, i, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }));
+			availableMoves.push_back(Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }));
 	}
 }
 
@@ -367,14 +382,14 @@ void KlondikeSolver::_find_partial_run_moves(MoveList& availableMoves) {
 }
 
 void KlondikeSolver::_find_stock_moves(MoveList& availableMoves) {
-	for (u8 i = stock_position_; i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
+	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
 		const Card& c = game_.stock[i];
 		for (u8 k = 0; k < KlondikeGame::NUM_TABLEAU_PILES; ++k) {
 			if (!game_.tableau[k].hasCards()) {
 				if (c.getRank() == RANK_KING) // Move king down to empty spot.
-					availableMoves.push_back(Move::Stock(c, stock_position_, i, PileID{ PileType::TABLEAU, k }));
+					availableMoves.push_back(Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::TABLEAU, k }));
 			} else if (_can_place_card(c, game_.tableau[k].getFromTop())) { // Place card on a tableau pile.
-				availableMoves.push_back(Move::Stock(c, stock_position_, i, PileID{ PileType::TABLEAU, k }));
+				availableMoves.push_back(Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::TABLEAU, k }));
 			}
 		}
 	}
@@ -387,38 +402,22 @@ bool KlondikeSolver::_find_available_moves(MoveList& availableMoves) {
 	_find_stock_moves(availableMoves);
 	_find_foundation_moves(availableMoves);
 
-	if (_is_stock_dirty()) // If we can shuffle the stock, do so last.
-		availableMoves.push_back(Move::RepileStock(game_.stock[stock_position_], stock_position_));
+	if (game_.isStockDirty()) // If we can shuffle the stock, do so last.
+		availableMoves.push_back(Move::RepileStock(game_.getStockPosition()));
 
 	return !availableMoves.empty();
 }
 
 bool KlondikeSolver::_is_seen_state() {
-	const std::string uniqueId(_get_unique_state_id(game_, _is_stock_dirty()));
+	const std::string uniqueId(game_.getUniqueStateID());
 	if (seen_states_.count(uniqueId))
 		return true;
 	seen_states_.insert(uniqueId);
 	return false;
 }
 
-bool KlondikeSolver::_is_stock_dirty() const {
-	if (!game_.stock.hasCards())
-		return false; // No cards left.
-	if (stock_position_ == KlondikeGame::NUM_STOCK_CARD_DRAW - 1)
-		return false; // At default position.
-	if (stock_position_ < KlondikeGame::NUM_STOCK_CARD_DRAW && stock_position_ == game_.stock.size() - 1)
-		return false; // Not enough cards left for a single stock draw.
-	return true;
-}
-
-void KlondikeSolver::_repile_stock() {
-	// This can cause overflow when we are out of cards, but is safe because we can never use stock_position_ without checking if it is valid anyway.
-	stock_position_ = game_.stock.size() < KlondikeGame::NUM_STOCK_CARD_DRAW ? game_.stock.size() - 1 : KlondikeGame::NUM_STOCK_CARD_DRAW - 1;
-}
-
 void KlondikeSolver::_init() {
 	game_.setUpGame();
-	_repile_stock();
 	seen_states_.reserve( static_cast<unsigned int>(std::min(maxStates, static_cast<Solitaire::u64>(seen_states_.max_size()))));
 }
 
@@ -463,26 +462,9 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 
 void KlondikeSolver::_do_move(const Move& m) {
 	move_sequence_.push_back(m);
-	switch (m.type) {
-	case MoveType::TABLEAU_PARTIAL:
+	if (m.type == MoveType::TABLEAU_PARTIAL)
 		partial_run_move_cards_.push_back(m.movedCard);
-		[[fallthrough]];
-	case MoveType::TABLEAU: // Move one or several cards from one pile to another.
-		Pile::MoveCards(game_.getPile(m.fromPile), game_.getPile(m.toPile), m.cardsToMove);
-		if (m.flippedCard) // Reveal an uncovered card.
-			game_.getPile(m.fromPile).getFromTop().flipCard();
-		break;
-	case MoveType::STOCK: // Move one card from stock to a tableau or foundation pile.
-		if (m.stockMovePosition != 0)
-			stock_position_ = m.stockMovePosition - 1; // Move to previous card (now made visible).
-		else
-			_repile_stock(); // We've used up all the "waste" cards. Need to re-pile or we wouldn't be looking at a card anymore.
-		Pile::MoveCard(game_.getPile(m.fromPile), m.stockMovePosition, game_.getPile(m.toPile));
-		break;
-	case MoveType::REPILE_STOCK: // Shuffle the stock, resetting the stock position.
-		_repile_stock();
-		break;
-	}
+	KlondikeSolver::doMove(game_, m);
 }
 
 void KlondikeSolver::_undo_move(const Move& m) {
@@ -503,11 +485,10 @@ void KlondikeSolver::_undo_move(const Move& m) {
 		Pile::MoveCards(game_.getPile(m.toPile), game_.getPile(m.fromPile), m.cardsToMove);
 		break;
 	case MoveType::STOCK: // Move one card from the end of a tableau or foundation pile back to the stock pile.
-		stock_position_ = m.stockPosition;
 		Pile::MoveCard(game_.getPile(m.toPile), -1, game_.getPile(m.fromPile), m.stockMovePosition);
-		break;
+		[[fallthrough]];
 	case MoveType::REPILE_STOCK: // Undo stock re-pile by moving the stock position back to its previous position.
-		stock_position_ = m.stockPosition;
+		game_.setStockPosition(m.stockPosition);
 		break;
 	}
 }
@@ -522,4 +503,26 @@ GameResult KlondikeSolver::Solve() {
 		move_sequence_.clear();
 
 	return GameResult{ states_tried_, game_.seed, move_sequence_, r };
+}
+
+void KlondikeSolver::doMove(KlondikeGame& game, const Move& m) {
+	switch (m.type) {
+	case MoveType::TABLEAU_PARTIAL:
+		[[fallthrough]];
+	case MoveType::TABLEAU: // Move one or several cards from one pile to another.
+		Pile::MoveCards(game.getPile(m.fromPile), game.getPile(m.toPile), m.cardsToMove);
+		if (m.flippedCard) // Reveal an uncovered card.
+			game.getPile(m.fromPile).getFromTop().flipCard();
+		break;
+	case MoveType::STOCK: // Move one card from stock to a tableau or foundation pile.
+		if (m.stockMovePosition != 0)
+			game.setStockPosition(m.stockMovePosition - 1); // Move to previous card (now made visible).
+		else
+			game.repileStock(); // We've used up all the "waste" cards. Need to re-pile or we wouldn't be looking at a card anymore.
+		Pile::MoveCard(game.getPile(m.fromPile), m.stockMovePosition, game.getPile(m.toPile));
+		break;
+	case MoveType::REPILE_STOCK: // Shuffle the stock, resetting the stock position.
+		game.repileStock();
+		break;
+	}
 }

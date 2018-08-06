@@ -74,6 +74,7 @@ namespace Solitaire {
 
 	class Card {
 	public:
+		Card() = default;
 		Card(Suit suit, Rank rank, bool isFaceUp=true) : suit_(suit), rank_(rank), is_face_up_(isFaceUp) {}
 
 		~Card() = default;
