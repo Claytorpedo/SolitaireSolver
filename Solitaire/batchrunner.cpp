@@ -11,11 +11,13 @@
 
 #include <direct.h>
 #include <errno.h>
+#include <chrono>
+using Clock = std::chrono::high_resolution_clock;
 
 using namespace solitaire;
 
 namespace {
-	const unsigned int BATCH_SIZE = 10;
+	const unsigned int BATCH_SIZE = 100;
 
 	const std::string RESULTS_DIR = "./results/";
 	const std::string SOLUTIONS_DIR = RESULTS_DIR + "/solutions/";
@@ -90,9 +92,12 @@ bool batchrunner::run() {
 
 	std::vector<GameResult> results;
 	results.reserve(BATCH_SIZE);
+	KlondikeSolver solver(5000000);
+
+	const auto timeStart = Clock::now();
 	for (u32 i = 0; i < BATCH_SIZE; ++i) {
-		KlondikeSolver solver(i, 5000000);
-		const GameResult result = solver.Solve();
+		solver.setSeed(i);
+		const GameResult result = solver.solve();
 		results.push_back(result);
 		std::cout << "************************************************************************\n";
 		std::cout << "Seed: " << result.seed << " is " << (result.result == GameResult::Result::WIN ? "win" : result.result == GameResult::Result::LOSE ? "loss" : "unknown") << "\n";
@@ -101,7 +106,8 @@ bool batchrunner::run() {
 		}
 	}
 	_write_results(results);
-
+	const auto timeEnd = Clock::now();
+	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::nanoseconds>(timeEnd - timeStart).count() << " nanos\n";
 	return true;
 }
 

@@ -35,7 +35,7 @@ namespace {
 }
 
 void KlondikeGame::setUpGame() {
-	stock = Pile(PileType::STOCK, GenDeck(seed));
+	stock = Pile(PileType::STOCK, GenDeck(seed_));
 	for (u8 i = 0; i < NUM_TABLEAU_PILES; ++i) {
 		Pile::MoveCards(stock, tableau[i], i + 1);
 		for (u8 k = 0; k < i; ++k)

@@ -20,9 +20,8 @@ namespace solitaire {
 		static constexpr u8 NUM_FOUNDATION_PILES = static_cast<u8>(Suit::TOTAL_SUITS);
 		static constexpr u8 NUM_STOCK_CARD_DRAW = 3; // Number of cards to deal from the stock at a time.
 
-		const u64 seed = 0;
-
-		KlondikeGame(u64 seed) : seed(seed) {}
+		KlondikeGame() = default;
+		KlondikeGame(u64 seed) : seed_(seed) {}
 
 		void setUpGame();
 
@@ -31,6 +30,7 @@ namespace solitaire {
 
 		u8   getStockPosition() const { return stock_position_; }
 		void setStockPosition(u8 position) { stock_position_ = position; }
+		u64  getSeed() const { return seed_; }
 
 		bool isGameWon() const;
 		bool isStockDirty() const; // Whether the stock can be repiled (stock position is not pointing to the first available card).
@@ -41,6 +41,7 @@ namespace solitaire {
 		std::string getUniqueStateID() const;
 
 	public:
+		u64 seed_ = 0;
 		std::vector<Pile> tableau{ NUM_TABLEAU_PILES, Pile(PileType::TABLEAU) };
 		std::vector<Pile> foundation{ NUM_FOUNDATION_PILES, Pile(PileType::FOUNDATION) };
 		Pile stock{ PileType::STOCK };

@@ -232,7 +232,10 @@ bool KlondikeSolver::_is_seen_state() {
 }
 
 void KlondikeSolver::_init() {
-	game_.setUpGame();
+	states_tried_ = 0;
+	seen_states_.clear();
+	move_sequence_.clear();
+	partial_run_move_cards_.clear();
 	seen_states_.reserve( static_cast<unsigned int>(std::min(maxStates, static_cast<u64>(seen_states_.max_size()))));
 }
 
@@ -253,7 +256,7 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 	if (game_.isGameWon())
 		return GameResult::Result::WIN;
 
-	if (states_tried_ != 0 && states_tried_ >= maxStates)
+	if (states_tried_ != 0 && maxStates != 0 && states_tried_ >= maxStates)
 		return GameResult::Result::UNKNOWN; // Ran out of allowed states to try.
 
 	if (_find_available_moves(availableMoves)) {
@@ -308,16 +311,25 @@ void KlondikeSolver::_undo_move(const Move& m) {
 	}
 }
 
-GameResult KlondikeSolver::Solve() {
-	_init();
-
+GameResult KlondikeSolver::solve() {
 	u32 depth = 0;
 	GameResult::Result r = _solve_recursive(depth);
 
 	if (r == GameResult::Result::UNKNOWN || r == GameResult::Result::LOSE)
 		move_sequence_.clear();
 
-	return GameResult{ states_tried_, game_.seed, move_sequence_, r };
+	return GameResult{ states_tried_, game_.getSeed(), move_sequence_, r };
+}
+
+void KlondikeSolver::setSeed(u64 seed) {
+	game_ = KlondikeGame(seed);
+	game_.setUpGame();
+	_init();
+}
+
+void KlondikeSolver::setGame(const KlondikeGame& game) {
+	game_ = game;
+	_init();
 }
 
 void KlondikeSolver::doMove(KlondikeGame& game, const Move& m) {

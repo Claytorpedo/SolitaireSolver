@@ -27,10 +27,14 @@ namespace solitaire {
 	public:
 		const u64 maxStates = 0; // Max states == 0 -> search until solved.
 
-		KlondikeSolver(u64 seed, u64 maxStates = 0) : game_(seed), maxStates(maxStates)  {};
-		KlondikeSolver(KlondikeGame game, u64 maxStates = 0) : game_(game), maxStates(maxStates) {};
+		KlondikeSolver(u64 maxStates = 0) : maxStates(maxStates)  {};
 
-		GameResult Solve();
+		GameResult solve();
+
+		// (Re)set the solver with a new seed.
+		void setSeed(u64 seed);
+		// Set the solver with a game (if in progress, will determine if it is solvable from that point).
+		void setGame(const KlondikeGame& game);
 
 	public:
 		static void doMove(KlondikeGame& game, const Move& move);
