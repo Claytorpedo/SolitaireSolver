@@ -1,5 +1,9 @@
 #include "KlondikeGame.hpp"
 
+#include <iomanip>
+#include <sstream>
+#include <string>
+
 using namespace solitaire;
 
 namespace {
@@ -109,10 +113,17 @@ void KlondikeGame::printGame(std::ostream& output) const {
 	output << BORDER;
 
 	// Print stock as a string of entries.
-	output << "stock: ";
-	for (u8 i = 0; i < stock.size(); ++i)
-		output << CardToStr(stock[i]) << ", ";
-	output << "\n";
+	std::ostringstream stockPositionStr;
+	const std::string stockStr = "stock: ";
+	output << stockStr;
+	stockPositionStr << std::setw(stockStr.size()) << " ";
+	for (u8 i = 0; i < stock.size(); ++i) {
+		const std::string cardStr = CardToStr(stock[i]) + ", ";
+		output << cardStr;
+		if (i < stock_position_)
+			stockPositionStr << std::setw(cardStr.size()) << " ";
+	}
+	output << "\n" << stockPositionStr.str() << "^\n";
 
 	// Print foundation.
 	for (u8 i = 0; i < CARD_HEIGHT; ++i) {
