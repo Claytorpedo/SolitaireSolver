@@ -71,7 +71,7 @@ namespace Solitaire {
 		bool isStockDirty() const; // Whether the stock can be repiled (stock position is not pointing to the first available card).
 		void repileStock(); // Equivalent to dealing all of stock to waste, and then back to stock.
 
-		void printGame() const;
+		void printGame(std::ostream& output = std::cout) const;
 
 		std::string getUniqueStateID() const;
 

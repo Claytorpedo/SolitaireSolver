@@ -127,36 +127,36 @@ std::string KlondikeGame::getUniqueStateID() const {
 		return id;
 }
 
-void KlondikeGame::printGame() const {
-	std::cout << BORDER;
+void KlondikeGame::printGame(std::ostream& output) const {
+	output << BORDER;
 
 	// Print stock as a string of entries.
-	std::cout << "stock: ";
+	output << "stock: ";
 	for (u8 i = 0; i < stock.size(); ++i)
-		std::cout << RankToStr(stock[i].getRank()) << SuitToChar(stock[i].getSuit()) << ", ";
-	std::cout << "\n";
+		output << RankToStr(stock[i].getRank()) << SuitToChar(stock[i].getSuit()) << ", ";
+	output << "\n";
 
 	// Print foundation.
 	for (u8 i = 0; i < CARD_HEIGHT; ++i) {
 		for (u8 k = 0; k < NUM_FOUNDATION_PILES; ++k) {
 			if (!foundation[k].hasCards()) {
-				std::cout << CARD_BLANK << CARD_GAP;
+				output << CARD_BLANK << CARD_GAP;
 				continue;
 			}
 			const Card& c = foundation[k][foundation[k].size() - 1];
 			if (i == 1 && c.isFaceUp()) {
-				std::cout << "|" << RankToStr(c.getRank()) << SuitToChar(c.getSuit()) << "|";
+				output << "|" << RankToStr(c.getRank()) << SuitToChar(c.getSuit()) << "|";
 			} else if (c.isFaceUp()) {
-				std::cout << CARD_FRONT[i];
+				output << CARD_FRONT[i];
 			} else {
-				std::cout << CARD_BACK[i];
+				output << CARD_BACK[i];
 			}
-			std::cout << CARD_GAP;
+			output << CARD_GAP;
 		}
-		std::cout << "\n";
+		output << "\n";
 	}
 
-	std::cout << "\n\n";
+	output << "\n\n";
 
 	// Print tableau.
 	bool printedSomething = true;
@@ -167,30 +167,30 @@ void KlondikeGame::printGame() const {
 		printedSomething = false;
 		for (u8 k = 0; k < NUM_TABLEAU_PILES; ++k) {
 			if (!tableau[k].hasCards() || tableau[k].size() < cardIndex) {
-				std::cout << CARD_BLANK << CARD_GAP;
+				output << CARD_BLANK << CARD_GAP;
 				continue;
 			}
 			printedSomething = true;
 			if (cardIndex == tableau[k].size()) { // Printing the bottom half of the last card in the pile.
 				const Card& c = tableau[k][cardIndex - 1];
-				std::cout << (c.isFaceUp() ? CARD_FRONT[cardDrawIndex + halfHeight] : CARD_BACK[cardDrawIndex + halfHeight]);
+				output << (c.isFaceUp() ? CARD_FRONT[cardDrawIndex + halfHeight] : CARD_BACK[cardDrawIndex + halfHeight]);
 			} else { // Printing the top half of the current card in the pile.
 				const Card& c = tableau[k][cardIndex];
 				if (c.isFaceUp()) {
 					if (cardDrawIndex == 1)
-						std::cout << "|" << RankToStr(c.getRank()) << SuitToChar(c.getSuit()) << "|";
+						output << "|" << RankToStr(c.getRank()) << SuitToChar(c.getSuit()) << "|";
 					else
-						std::cout << CARD_FRONT[cardDrawIndex];
+						output << CARD_FRONT[cardDrawIndex];
 				} else {
-					std::cout << CARD_BACK[cardDrawIndex];
+					output << CARD_BACK[cardDrawIndex];
 				}
 			}
-			std::cout << CARD_GAP;
+			output << CARD_GAP;
 		}
-		std::cout << "\n";
+		output << "\n";
 	}
 
-	std::cout << BORDER;
+	output << BORDER;
 }
 
 // ----------------------------- Klondike Solver -----------------------------
