@@ -48,9 +48,9 @@ namespace solitaire {
 		// Moves that move a full run (flip a tableau card or clear an empty tableau spot).
 		void _find_full_run_moves(MoveList& availableMoves);
 		// Moves to the foundation.
-		void _find_foundation_moves(MoveList& availableMoves);
+		void _find_moves_to_foundation(MoveList& availableMoves);
 		// Moves from stock to tableau.
-		void _find_stock_moves(MoveList& availableMoves);
+		void _find_stock_to_tableau_moves(MoveList& availableMoves);
 		// Moves of partial runs from one tableau pile to another.
 		void _find_partial_run_moves(MoveList& availableMoves);
 

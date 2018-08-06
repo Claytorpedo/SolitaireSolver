@@ -135,7 +135,7 @@ bool KlondikeSolver::_find_auto_moves(MoveList& autoMoves) {
 	return autoMoves.size();
 }
 
-void KlondikeSolver::_find_foundation_moves(MoveList& availableMoves) {
+void KlondikeSolver::_find_moves_to_foundation(MoveList& availableMoves) {
 	for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
 		if (!game_.tableau[i].hasCards())
 			continue;
@@ -196,7 +196,7 @@ void KlondikeSolver::_find_partial_run_moves(MoveList& availableMoves) {
 	}
 }
 
-void KlondikeSolver::_find_stock_moves(MoveList& availableMoves) {
+void KlondikeSolver::_find_stock_to_tableau_moves(MoveList& availableMoves) {
 	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
 		const Card& c = game_.stock[i];
 		for (u8 k = 0; k < KlondikeGame::NUM_TABLEAU_PILES; ++k) {
@@ -214,8 +214,8 @@ bool KlondikeSolver::_find_available_moves(MoveList& availableMoves) {
 	// Order here sets priority.
 	_find_full_run_moves(availableMoves);
 	_find_partial_run_moves(availableMoves);
-	_find_stock_moves(availableMoves);
-	_find_foundation_moves(availableMoves);
+	_find_stock_to_tableau_moves(availableMoves);
+	_find_moves_to_foundation(availableMoves);
 
 	if (game_.isStockDirty()) // If we can shuffle the stock, do so last.
 		availableMoves.push_back(Move::RepileStock(game_.getStockPosition()));
@@ -302,7 +302,7 @@ void KlondikeSolver::_undo_move(const Move& m) {
 	case MoveType::STOCK: // Move one card from the end of a tableau or foundation pile back to the stock pile.
 		Pile::MoveCard(game_.getPile(m.toPile), -1, game_.getPile(m.fromPile), m.stockMovePosition);
 		[[fallthrough]];
-	case MoveType::REPILE_STOCK: // Undo stock re-pile by moving the stock position back to its previous position.
+	case MoveType::REPILE_STOCK: // Undo stock repile by moving the stock position back to its previous position.
 		game_.setStockPosition(m.stockPosition);
 		break;
 	}
@@ -330,11 +330,11 @@ void KlondikeSolver::doMove(KlondikeGame& game, const Move& m) {
 			game.getPile(m.fromPile).getFromTop().flipCard();
 		break;
 	case MoveType::STOCK: // Move one card from stock to a tableau or foundation pile.
+		Pile::MoveCard(game.getPile(m.fromPile), m.stockMovePosition, game.getPile(m.toPile));
 		if (m.stockMovePosition != 0)
 			game.setStockPosition(m.stockMovePosition - 1); // Move to previous card (now made visible).
 		else
 			game.repileStock(); // We've used up all the "waste" cards. Need to re-pile or we wouldn't be looking at a card anymore.
-		Pile::MoveCard(game.getPile(m.fromPile), m.stockMovePosition, game.getPile(m.toPile));
 		break;
 	case MoveType::REPILE_STOCK: // Shuffle the stock, resetting the stock position.
 		game.repileStock();
