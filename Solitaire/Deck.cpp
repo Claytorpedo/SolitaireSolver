@@ -1,10 +1,10 @@
-#include "Deck.h"
+#include "Deck.hpp"
 
 #include <random>
 
-#include "Card.h"
+#include "Card.hpp"
 
-namespace Solitaire {
+namespace solitaire {
 	void Pile::MoveCards(Pile& from, Pile& to, u8 numCards) {
 		const auto start(from.deck_.end() - numCards);
 		to.deck_.insert(to.deck_.end(), std::make_move_iterator(start), std::make_move_iterator(from.deck_.end()));

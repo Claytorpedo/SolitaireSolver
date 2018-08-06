@@ -1,12 +1,12 @@
 #pragma once
 
-#include "units.h"
+#include "units.hpp"
 
 #include <vector>
 #include <iostream>
 #include <string>
 
-namespace Solitaire {
+namespace solitaire {
 	constexpr Rank CARDS_PER_SUIT = 13;
 	constexpr Rank RANK_KING = CARDS_PER_SUIT;
 	constexpr u8 CARDS_PER_DECK = static_cast<u8>(CARDS_PER_SUIT) * 4;
@@ -18,6 +18,31 @@ namespace Solitaire {
 		SPADES,
 		TOTAL_SUITS
 	};
+
+	inline char SuitToChar(Suit s) {
+		switch (s) {
+		case Suit::HEARTS:   return 'H';
+		case Suit::CLUBS:    return 'C';
+		case Suit::DIAMONDS: return 'D';
+		case Suit::SPADES:   return 'S';
+		default:
+			return '?';
+		}
+	}
+
+	inline std::string RankToStr(Rank r) {
+		if (r == 1)
+			return "A ";
+		if (r < 10)
+			return std::to_string(r) + " ";
+		if (r == 10)
+			return "10";
+		if (r == 11)
+			return "J ";
+		if (r == 12)
+			return "Q ";
+		return "K ";
+	}
 
 	inline bool IsRed(Suit s) {
 		return s == Suit::HEARTS || s == Suit::DIAMONDS;
@@ -43,41 +68,10 @@ namespace Solitaire {
 		}
 	}
 
-	inline char SuitToChar(Suit s) {
-		switch (s) {
-		case Suit::HEARTS:
-			return 'H';
-		case Suit::CLUBS:
-			return 'C';
-		case Suit::DIAMONDS:
-			return 'D';
-		case Suit::SPADES:
-			return 'S';
-		default:
-			return '?';
-		}
-	}
-
-	inline std::string RankToStr(Rank r) {
-		if (r == 1)
-			return "A ";
-		if (r < 10)
-			return std::to_string(r) + " ";
-		if (r == 10)
-			return "10";
-		if (r == 11)
-			return "J ";
-		if (r == 12)
-			return "Q ";
-		return "K ";
-	}
-
 	class Card {
 	public:
 		Card() = default;
 		Card(Suit suit, Rank rank, bool isFaceUp=true) : suit_(suit), rank_(rank), is_face_up_(isFaceUp) {}
-
-		~Card() = default;
 
 		void flipCard() { is_face_up_ = !is_face_up_; }
 
@@ -87,7 +81,8 @@ namespace Solitaire {
 
 		inline bool operator==(const Card& o) const { return rank_ == o.rank_ && suit_ == o.suit_; }
 
-		std::string getSuitName() { return suit_ == Suit::HEARTS ? "Hearts" : suit_ == Suit::CLUBS ? "Clubs" : suit_ == Suit::DIAMONDS ? "Diamonds" : "Spades"; }
+		std::string getSuitName() const { return suit_ == Suit::HEARTS ? "Hearts" : suit_ == Suit::CLUBS ? "Clubs" : suit_ == Suit::DIAMONDS ? "Diamonds" : "Spades"; }
+		std::string toStr() const { return RankToStr(rank_) + SuitToChar(suit_); }
 
 	private:
 		Suit suit_ = Suit::HEARTS;

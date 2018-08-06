@@ -1,13 +1,12 @@
 #pragma once
 
-#include "units.h"
-#include "Card.h"
+#include "units.hpp"
+#include "Card.hpp"
 
 #include <vector>
-#include <iostream>
 #include <string>
 
-namespace Solitaire {
+namespace solitaire {
 	class Card;
 
 	using Deck = std::vector<Card>;

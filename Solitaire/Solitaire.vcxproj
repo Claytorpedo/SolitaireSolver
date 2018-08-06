@@ -120,15 +120,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Deck.h" />
-    <ClInclude Include="KlondikeSolver.h" />
-    <ClInclude Include="Card.h" />
-    <ClInclude Include="units.h" />
+    <ClInclude Include="batchrunner.hpp" />
+    <ClInclude Include="Deck.hpp" />
+    <ClInclude Include="KlondikeGame.hpp" />
+    <ClInclude Include="KlondikeSolver.hpp" />
+    <ClInclude Include="Card.hpp" />
+    <ClInclude Include="Move.hpp" />
+    <ClInclude Include="units.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Deck.cpp" />
+    <ClCompile Include="KlondikeGame.cpp" />
     <ClCompile Include="KlondikeSolver.cpp" />
+    <ClCompile Include="batchrunner.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Move.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <type_traits>
 
-namespace Solitaire {
+namespace solitaire {
 	using u8  = uint_fast8_t;
 	using u16 = uint_fast16_t;
 	using u32 = uint_fast32_t;
