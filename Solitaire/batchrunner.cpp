@@ -10,10 +10,13 @@
 #include "KlondikeSolver.hpp"
 
 #include <direct.h>
+#include <errno.h>
 
 using namespace solitaire;
 
 namespace {
+	const unsigned int BATCH_SIZE = 10;
+
 	const std::string RESULTS_DIR = "./results/";
 	const std::string SOLUTIONS_DIR = RESULTS_DIR + "/solutions/";
 	const std::string WIN_FILE = RESULTS_DIR + "winning_seeds.txt";
@@ -22,12 +25,12 @@ namespace {
 	const unsigned int SEED_PADDING = 16; // Zero padding for output to files.
 
 	bool _startup() {
-		if (_mkdir(RESULTS_DIR.c_str()) != 0) {
-			std::cerr << "Failed to create results directory./n";
+		if (_mkdir(RESULTS_DIR.c_str()) != 0 && errno != EEXIST) {
+			std::cerr << "Failed to create results directory.\n";
 			return false;
 		}
-		if (_mkdir(SOLUTIONS_DIR.c_str()) != 0) {
-			std::cerr << "Failed to create solutions directory./n";
+		if (_mkdir(SOLUTIONS_DIR.c_str()) != 0 && errno != EEXIST) {
+			std::cerr << "Failed to create solutions directory.\n";
 			return false;
 		}
 		return true;
@@ -86,8 +89,8 @@ bool batchrunner::run() {
 		return false;
 
 	std::vector<GameResult> results;
-	results.reserve(100);
-	for (u32 i = 0; i < 100; ++i) {
+	results.reserve(BATCH_SIZE);
+	for (u32 i = 0; i < BATCH_SIZE; ++i) {
 		KlondikeSolver solver(i, 5000000);
 		const GameResult result = solver.Solve();
 		results.push_back(result);
