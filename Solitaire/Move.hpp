@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "units.hpp"
@@ -21,6 +22,14 @@ namespace solitaire {
 		case(MoveType::STOCK):           return "STOCK";
 		case(MoveType::REPILE_STOCK):    return "REPILE_STOCK";
 		}
+	}
+
+	inline std::string MoveToStr(const Move& m) {
+		std::string moveStr = MoveTypeToStr(m.type);
+		if (m.type != MoveType::REPILE_STOCK) {
+			moveStr += " " + CardToStr(m.movedCard);
+		}
+		return moveStr;
 	}
 
 	class Move { // Holds information for a move, as well as what's needed to undo that move.

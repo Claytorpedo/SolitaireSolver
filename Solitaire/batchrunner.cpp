@@ -41,24 +41,20 @@ namespace {
 		std::ofstream solutionFile(fileName.str(), std::ios::trunc);
 
 		// Print off moves list.
-
+		for (const Move& move : result.solution) {
+			solutionFile << MoveToStr(move) << " ";
+		}
+		solutionFile << "\n\n";
 
 		KlondikeGame game(result.seed);
 		game.setUpGame();
-
-
-
 
 		game.printGame(solutionFile);
 
 		for (const Move& move : result.solution) {
 			KlondikeSolver::doMove(game, move);
 			game.printGame(solutionFile);
-			solutionFile << "Move Type: ";
-
-			if (move.type != MoveType::REPILE_STOCK) {
-				solutionFile << " Moved Card: " << move.movedCard.toStr();
-			}
+			solutionFile << "Move: ";
 		}
 	}
 

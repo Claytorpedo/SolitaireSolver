@@ -44,6 +44,10 @@ namespace solitaire {
 		return "K ";
 	}
 
+	inline std::string CardToStr(const Card& c) {
+		return RankToStr(c.getRank()) + SuitToChar(c.getSuit());
+	}
+
 	inline bool IsRed(Suit s) {
 		return s == Suit::HEARTS || s == Suit::DIAMONDS;
 	}
@@ -82,7 +86,6 @@ namespace solitaire {
 		inline bool operator==(const Card& o) const { return rank_ == o.rank_ && suit_ == o.suit_; }
 
 		std::string getSuitName() const { return suit_ == Suit::HEARTS ? "Hearts" : suit_ == Suit::CLUBS ? "Clubs" : suit_ == Suit::DIAMONDS ? "Diamonds" : "Spades"; }
-		std::string toStr() const { return RankToStr(rank_) + SuitToChar(suit_); }
 
 	private:
 		Suit suit_ = Suit::HEARTS;

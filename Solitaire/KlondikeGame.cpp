@@ -111,7 +111,7 @@ void KlondikeGame::printGame(std::ostream& output) const {
 	// Print stock as a string of entries.
 	output << "stock: ";
 	for (u8 i = 0; i < stock.size(); ++i)
-		output << stock[i].toStr() << ", ";
+		output << CardToStr(stock[i]) << ", ";
 	output << "\n";
 
 	// Print foundation.
@@ -123,7 +123,7 @@ void KlondikeGame::printGame(std::ostream& output) const {
 			}
 			const Card& c = foundation[k][foundation[k].size() - 1];
 			if (i == 1 && c.isFaceUp()) {
-				output << "|" << c.toStr() << "|";
+				output << "|" << CardToStr(c) << "|";
 			} else if (c.isFaceUp()) {
 				output << CARD_FRONT[i];
 			} else {
@@ -156,7 +156,7 @@ void KlondikeGame::printGame(std::ostream& output) const {
 				const Card& c = tableau[k][cardIndex];
 				if (c.isFaceUp()) {
 					if (cardDrawIndex == 1)
-						output << "|" << c.toStr() << "|";
+						output << "|" << CardToStr(c) << "|";
 					else
 						output << CARD_FRONT[cardDrawIndex];
 				} else {
