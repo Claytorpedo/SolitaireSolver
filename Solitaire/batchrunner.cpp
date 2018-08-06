@@ -24,7 +24,19 @@ namespace {
 	const std::string WIN_FILE = RESULTS_DIR + "winning_seeds.txt";
 	const std::string LOSE_FILE = RESULTS_DIR + "losing_seeds.txt";
 	const std::string UNKNOWN_FILE = RESULTS_DIR + "unknown_seeds.txt";
-	const unsigned int SEED_PADDING = 16; // Zero padding for output to files.
+
+	// Pad input to a given width.
+	template<typename T>
+	struct PadWrite {
+		PadWrite(T n, char fill = '0', unsigned int padding = 16) : n(n), fill(fill), padding(padding) {}
+		friend inline std::ostream& operator<<(std::ostream& stream, const PadWrite& writer) {
+			stream << std::setfill(writer.fill) << std::setw(writer.padding) << writer.n;
+			return stream;
+		}
+		T n;
+		char fill;
+		unsigned int padding;
+	};
 
 	bool _startup() {
 		if (_mkdir(RESULTS_DIR.c_str()) != 0 && errno != EEXIST) {
@@ -40,7 +52,7 @@ namespace {
 
 	void _write_solution_file(const GameResult& result) {
 		std::stringstream fileName;
-		fileName << SOLUTIONS_DIR << std::setfill('0') << std::setw(SEED_PADDING) << result.seed << ".txt";
+		fileName << SOLUTIONS_DIR << PadWrite(result.seed) << ".txt";
 		std::ofstream solutionFile(fileName.str(), std::ios::trunc);
 
 		// Print off moves list.
@@ -65,21 +77,18 @@ namespace {
 		std::ofstream winFile(WIN_FILE, std::ios::app);
 		std::ofstream loseFile(LOSE_FILE, std::ios::app);
 		std::ofstream unknownFile(UNKNOWN_FILE, std::ios::app);
-		winFile << std::setfill('0');
-		loseFile << std::setfill('0');
-		unknownFile << std::setfill('0');
 
 		for (const GameResult& result : results) {
 			switch (result.result) {
 			case(GameResult::Result::WIN):
-				winFile << std::setw(SEED_PADDING) << result.seed << " (positions tried: " << result.positionsTried << ", solution length: " << result.solution.size() << ")\n";
+				winFile << PadWrite(result.seed) << " (positions tried: " << PadWrite(result.positionsTried, ' ') << ", solution length: " << PadWrite(result.solution.size(), ' ') << ")\n";
 				_write_solution_file(result);
 				break;
 			case(GameResult::Result::LOSE):
-				loseFile << std::setw(SEED_PADDING) << result.seed << " (positions tried: " << result.positionsTried << ")\n";
+				loseFile << PadWrite(result.seed) << " (positions tried: " << PadWrite(result.positionsTried, ' ') << ")\n";
 				break;
 			case(GameResult::Result::UNKNOWN):
-				unknownFile << std::setw(SEED_PADDING) << result.seed << " (positions tried: " << result.positionsTried << ")\n";
+				unknownFile << PadWrite(result.seed) << " (positions tried: " << PadWrite(result.positionsTried, ' ') << ")\n";
 				break;
 			}
 		}
@@ -110,23 +119,3 @@ bool batchrunner::run() {
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::nanoseconds>(timeEnd - timeStart).count() << " nanos\n";
 	return true;
 }
-
-/*	WIN SEEDS:
-	1
-	2
-	3
-	4
-	5
-	6
-	8
-	1336
-	11      - 1963757
-	21      - 117
-	26      - 74
-
-
-	LOSE SEEDS:
-	0
-	7       - 139437137
-	42      - 68
-*/
