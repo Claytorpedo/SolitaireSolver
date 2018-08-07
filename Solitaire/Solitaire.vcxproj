@@ -130,6 +130,7 @@
     <ClInclude Include="KlondikeSolver.hpp" />
     <ClInclude Include="Card.hpp" />
     <ClInclude Include="Move.hpp" />
+    <ClInclude Include="threadpool\threadpool\Threadpool.hpp" />
     <ClInclude Include="units.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -139,6 +140,7 @@
     <ClCompile Include="batchrunner.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Move.cpp" />
+    <ClCompile Include="threadpool\threadpool\Threadpool.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,0 +1,3 @@
+[submodule "Solitaire/threadpool"]
+	path = Solitaire/threadpool
+	url = git@github.com:Claytorpedo/threadpool.git

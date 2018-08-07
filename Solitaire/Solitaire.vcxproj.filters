@@ -36,6 +36,9 @@
     <ClInclude Include="batchrunner.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="threadpool\threadpool\Threadpool.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="KlondikeSolver.cpp">
@@ -54,6 +57,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="KlondikeGame.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="threadpool\threadpool\Threadpool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
