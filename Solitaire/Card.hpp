@@ -63,7 +63,7 @@ namespace solitaire {
 		case Suit::SPADES:
 			return Suit::CLUBS;
 		default:
-			std::cerr << "Error (GetSameColourOtherSuit): Invalid card suit for.\n";
+			std::cerr << "Error (GetSameColourOtherSuit): Invalid card suit.\n";
 			return Suit::TOTAL_SUITS;
 		}
 	}
