@@ -302,8 +302,6 @@ void KlondikeSolver::_undo_move(const Move& m) {
 	case MoveType::TABLEAU: // Move one or several cards back from one pile to another.
 		if (m.flippedCard) // If we flipped a card, turn it back over first.
 			game_.getPile(m.fromPile).getFromTop().flipCard();
-		if (m.cardsToMove == 4 && game_.getPile(m.toPile).size() == 2)
-			game_.printGame();
 		Pile::MoveCards(game_.getPile(m.toPile), game_.getPile(m.fromPile), m.cardsToMove);
 		break;
 	case MoveType::STOCK: // Move one card from the end of a tableau or foundation pile back to the stock pile.
