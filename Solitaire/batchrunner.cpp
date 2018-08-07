@@ -111,7 +111,7 @@ namespace {
 
 	std::vector<GameResult> _batch_task(KlondikeSolver& solver, u64 startSeed, u64 numSeeds) {
 		std::vector<GameResult> results;
-		results.reserve(numSeeds);
+		results.reserve(static_cast<int>(numSeeds));
 
 		const u64 seedEnd = startSeed + numSeeds;
 		for (u64 i = startSeed; i < seedEnd; ++i) {
