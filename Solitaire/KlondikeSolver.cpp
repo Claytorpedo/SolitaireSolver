@@ -30,11 +30,11 @@ namespace {
 		return _can_move_to_foundation(card, foundation) && card.getRank() <= minRank + 2;
 	}
 	// Find first face-up card for the pile. Returns whether a run was found (false if pile has no cards).
-	bool _find_top_of_run(const Pile& pile, u8& out_run_length, const Card** optional_out_card=nullptr) {
+	bool _find_top_of_run(const Pile& pile, u8& out_run_length, Card* optional_out_card=nullptr) {
 		for (u8 i = 0; i < pile.size(); ++i) {
 			if (pile[i].isFaceUp()) {
 				if (optional_out_card)
-					*optional_out_card = &pile[i];
+					*optional_out_card = pile[i];
 				out_run_length = pile.size() - i;
 				return true;
 			}
@@ -107,32 +107,34 @@ bool KlondikeSolver::_is_card_available(const Card& cardToFind) const {
 	return false;
 }
 
-bool KlondikeSolver::_find_auto_moves(MoveList& autoMoves) {
+std::unique_ptr<Move> KlondikeSolver::_find_auto_move() {
+	// Auto moves can change the state of the board and interfere with each other, so only do one at a time.
 	for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
 		if (!game_.tableau[i].hasCards())
 			continue;
 		// First, check for a guaranteed moves to the foundation.
 		if (const Card& c = game_.tableau[i].getFromTop(); _guaranteed_move_to_foundation(c, game_.foundation)) {
 			const bool flippedCard = game_.tableau[i].size() > 1 && !game_.tableau[i].getFromTop(1).isFaceUp(); // Check if move will reveal a tableau card.
-			autoMoves.push_back(Move::Tableau(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }, 1, flippedCard));
+			return std::make_unique<Move>(Move::Tableau(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }, 1, flippedCard));
 		} else {
 			// Second, look for tableau runs that have two open options in the tableau.
 			u8 runLength;
-			const Card* topOfRun;
+			Card topOfRun;
 			_find_top_of_run(game_.tableau[i], runLength, &topOfRun);
-			if (u8 firstSpot; _has_two_available_spots(*topOfRun, game_.tableau, firstSpot)) {
+			if (u8 firstSpot; _has_two_available_spots(topOfRun, game_.tableau, firstSpot)) {
 				const bool flippedCard = !game_.tableau[i][0].isFaceUp(); // Moving full run, so will flip if there are still face-down cards.
-				autoMoves.push_back(Move::Tableau(*topOfRun, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, firstSpot }, runLength, flippedCard));
+				return std::make_unique<Move>(Move::Tableau(topOfRun, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, firstSpot }, runLength, flippedCard));
+
 			// Last, look for a run with a king, and see if there are enough tableau spaces to guarantee it has room.
 			// Note that while this case can run while the first two also run, it would get an invalid run length.
 			// It can instead be picked up be subsequent calls.
 			} else if (!game_.tableau[i][0].isFaceUp()) { // Don't move a king that is already on an empty spot.
-				if (u8 emptySpot;  topOfRun->getRank() == RANK_KING && _has_space_for_all_kings(game_.tableau, emptySpot))
-					autoMoves.push_back(Move::Tableau(*topOfRun, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, emptySpot }, runLength, true));
+				if (u8 emptySpot;  topOfRun.getRank() == RANK_KING && _has_space_for_all_kings(game_.tableau, emptySpot))
+					return std::make_unique<Move>(Move::Tableau(topOfRun, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, emptySpot }, runLength, true));
 			}
 		}
 	}
-	return autoMoves.size();
+	return nullptr;
 }
 
 void KlondikeSolver::_find_moves_to_foundation(MoveList& availableMoves) {
@@ -155,16 +157,16 @@ void KlondikeSolver::_find_moves_to_foundation(MoveList& availableMoves) {
 void KlondikeSolver::_find_full_run_moves(MoveList& availableMoves) {
 	for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
 		const Pile& fromPile = game_.tableau[i];
-		const Card* card;
+		Card card;
 		u8 runLength;
-		if (!_find_top_of_run(fromPile, runLength, &card) || (runLength == fromPile.size() && card->getRank() == RANK_KING))
+		if (!_find_top_of_run(fromPile, runLength, &card) || (runLength == fromPile.size() && card.getRank() == RANK_KING))
 			continue; // Empty pile or King in empty space.
 		// Find a place to move the card to. Only take first place if there are multiple.
 		u8 toPile;
-		if (!_find_tableau_to_tableau_move(*card, game_.tableau, i, toPile))
+		if (!_find_tableau_to_tableau_move(card, game_.tableau, i, toPile))
 			continue;
 		const bool flippedCard = game_.tableau[i].size() > runLength;
-		availableMoves.push_back(Move::Tableau(*card, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, toPile }, runLength, flippedCard));
+		availableMoves.push_back(Move::Tableau(card, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, toPile }, runLength, flippedCard));
 	}
 }
 
@@ -178,7 +180,7 @@ void KlondikeSolver::_find_partial_run_moves(MoveList& availableMoves) {
 			const Card& c = fromPile.getFromTop(k - 1); // Next card in run.
 
 			// Check if this move is in our move history. If we've already moved it, ignore this card.
-			if (std::find(partial_run_move_cards_.begin(), partial_run_move_cards_.end(), c) != partial_run_move_cards_.end())
+			if (std::find(partial_run_move_cards_.cbegin(), partial_run_move_cards_.cend(), c) != partial_run_move_cards_.cend())
 				continue;
 
 			// See if there is a spot to move this partial run to.
@@ -243,14 +245,11 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 	if (_is_seen_state())
 		return GameResult::Result::LOSE;
 
-	MoveList autoMoves, tempAutoMoves, availableMoves;
+	MoveList autoMoves, availableMoves;
 
-	while (_find_auto_moves(tempAutoMoves)) {
-		for (auto m : tempAutoMoves) {
-			autoMoves.push_back(m);
-			_do_move(m);
-		}
-		tempAutoMoves.clear();
+	while (std::unique_ptr<Move> m = _find_auto_move()) {
+		autoMoves.push_back(*m.get());
+		_do_move(*m.get());
 	}
 
 	if (game_.isGameWon())
@@ -260,9 +259,12 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 		return GameResult::Result::UNKNOWN; // Ran out of allowed states to try.
 
 	if (_find_available_moves(availableMoves)) {
-		for (auto m : availableMoves) {
+		for (const Move& m : availableMoves) {
 			_do_move(m);
 			++states_tried_;
+
+			if (false)
+				game_.printGame();
 
 			GameResult::Result r = _solve_recursive(depth + 1);
 			if (r != GameResult::Result::LOSE)
@@ -300,6 +302,8 @@ void KlondikeSolver::_undo_move(const Move& m) {
 	case MoveType::TABLEAU: // Move one or several cards back from one pile to another.
 		if (m.flippedCard) // If we flipped a card, turn it back over first.
 			game_.getPile(m.fromPile).getFromTop().flipCard();
+		if (m.cardsToMove == 4 && game_.getPile(m.toPile).size() == 2)
+			game_.printGame();
 		Pile::MoveCards(game_.getPile(m.toPile), game_.getPile(m.fromPile), m.cardsToMove);
 		break;
 	case MoveType::STOCK: // Move one card from the end of a tableau or foundation pile back to the stock pile.

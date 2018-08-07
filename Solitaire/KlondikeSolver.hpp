@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_set>
+#include <memory>
 #include <string>
 
 #include "units.hpp"
@@ -58,8 +59,8 @@ namespace solitaire {
 		// Moves of partial runs from one tableau pile to another.
 		void _find_partial_run_moves(MoveList& availableMoves);
 
-		// Returns true if any auto-moves (guaranteed moves) were found.
-		bool _find_auto_moves(MoveList& autoMoves);
+		// Returns true if any auto-move (guaranteed move) was found.
+		std::unique_ptr<Move> _find_auto_move();
 		// Returns true if any available moves were found.
 		bool _find_available_moves(MoveList& availableMoves);
 
