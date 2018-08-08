@@ -84,16 +84,23 @@ bool KlondikeGame::isGameWon() const {
 bool KlondikeGame::isStockDirty() const {
 	if (!stock.hasCards())
 		return false; // No cards left.
-	if (stock_position_ == KlondikeGame::NUM_STOCK_CARD_DRAW - 1)
+	if (stock_position_ == NUM_STOCK_CARD_DRAW - 1)
 		return false; // At default position.
-	if (stock_position_ < KlondikeGame::NUM_STOCK_CARD_DRAW && stock_position_ == stock.size() - 1)
+	if (stock_position_ < NUM_STOCK_CARD_DRAW && stock_position_ == stock.size() - 1)
 		return false; // Not enough cards left for a single stock draw.
 	return true;
 }
 
 void KlondikeGame::repileStock() {
 	// This can cause overflow when we are out of cards, but is safe because we can never use stock_position_ without checking if the stock is empty anyway.
-	stock_position_ = stock.size() < KlondikeGame::NUM_STOCK_CARD_DRAW ? stock.size() - 1 : KlondikeGame::NUM_STOCK_CARD_DRAW - 1;
+	stock_position_ = stock.size() < NUM_STOCK_CARD_DRAW ? stock.size() - 1 : NUM_STOCK_CARD_DRAW - 1;
+}
+
+u8 KlondikeGame::getNextInStock(u8 fromPosition) const {
+	if (static_cast<int>(fromPosition) >= static_cast<int>(stock.size() - 1))
+		return stock.size();
+	fromPosition += NUM_STOCK_CARD_DRAW;
+	return fromPosition < stock.size() ? fromPosition : stock.size() - 1;
 }
 
 std::string KlondikeGame::getUniqueStateID() const {

@@ -100,7 +100,7 @@ bool KlondikeSolver::_is_card_available(const Card& cardToFind) const {
 		if (cardToFind == game_.tableau[i].getFromTop())
 			return true;
 	}
-	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
+	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i = game_.getNextInStock(i)) {
 		if (cardToFind == game_.stock[i])
 			return true;
 	}
@@ -147,7 +147,7 @@ void KlondikeSolver::_find_moves_to_foundation(MoveList& availableMoves) {
 			availableMoves.push_back(Move::Tableau(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }, 1, flippedCard));
 		}
 	}
-	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
+	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i = game_.getNextInStock(i)) {
 		const Card& c = game_.stock[i];
 		if (_can_move_to_foundation(c, game_.foundation))
 			availableMoves.push_back(Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }));
@@ -199,7 +199,7 @@ void KlondikeSolver::_find_partial_run_moves(MoveList& availableMoves) {
 }
 
 void KlondikeSolver::_find_stock_to_tableau_moves(MoveList& availableMoves) {
-	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i += KlondikeGame::NUM_STOCK_CARD_DRAW) {
+	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i = game_.getNextInStock(i)) {
 		const Card& c = game_.stock[i];
 		for (u8 k = 0; k < KlondikeGame::NUM_TABLEAU_PILES; ++k) {
 			if (!game_.tableau[k].hasCards()) {

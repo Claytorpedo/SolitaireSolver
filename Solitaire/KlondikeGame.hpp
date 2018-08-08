@@ -35,6 +35,9 @@ namespace solitaire {
 		bool isGameWon() const;
 		bool isStockDirty() const; // Whether the stock can be repiled (stock position is not pointing to the first available card).
 		void repileStock(); // Equivalent to dealing all of stock to waste, and then back to stock.
+		// Get next card from the stock, from a given position.
+		// If from position is the last card in the stock, returns stock.size().
+		u8 getNextInStock(u8 fromPosition) const;
 
 		void printGame(std::ostream& output = std::cout) const;
 
