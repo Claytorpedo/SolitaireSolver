@@ -26,12 +26,6 @@ namespace {
 	const char* const BORDER = "----------------------------------------------------------------\n";
 
 	const u8 CARD_HEIGHT = 4;
-
-	void _concat_pile_str(const Pile& pile, std::string& string) {
-		const u8 size = pile.size();
-		for (u8 i = 0; i < size; ++i)
-			string.push_back(static_cast<char>((toUType(pile[i].getSuit()) * CARDS_PER_SUIT) + pile[i].getRank()));
-	}
 }
 
 void KlondikeGame::setUpGame() {
@@ -101,19 +95,6 @@ u8 KlondikeGame::getNextInStock(u8 fromPosition) const {
 		return stock.size();
 	fromPosition += NUM_STOCK_CARD_DRAW;
 	return fromPosition < stock.size() ? fromPosition : stock.size() - 1;
-}
-
-std::string KlondikeGame::getUniqueStateID() const {
-	// Make a unique string id to represent a board state (not human readable).
-	std::string id;
-	id.reserve(CARDS_PER_DECK + 1);
-	id.push_back(isStockDirty() ? '1' : '0');
-	for (const Pile& pile : tableau)
-		_concat_pile_str(pile, id);
-	for (const Pile& pile : foundation)
-		_concat_pile_str(pile, id);
-	_concat_pile_str(stock, id);
-	return id;
 }
 
 void KlondikeGame::printGame(std::ostream& output) const {

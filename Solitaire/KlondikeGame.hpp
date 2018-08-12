@@ -41,8 +41,6 @@ namespace solitaire {
 
 		void printGame(std::ostream& output = std::cout) const;
 
-		std::string getUniqueStateID() const;
-
 	public:
 		u64 seed_ = 0;
 		std::vector<Pile> tableau{ NUM_TABLEAU_PILES, Pile(PileType::TABLEAU) };

@@ -226,11 +226,45 @@ bool KlondikeSolver::_find_available_moves(MoveList& availableMoves) {
 }
 
 bool KlondikeSolver::_is_seen_state() {
-	const std::string uniqueId(game_.getUniqueStateID());
-	if (seen_states_.count(uniqueId))
-		return true;
-	seen_states_.insert(uniqueId);
-	return false;
+	if (!move_sequence_.empty() && move_sequence_.back().type == MoveType::REPILE_STOCK)
+		return false; // Don't store new state on repile stock moves.
+
+	// Build a unique ID for the deck, using the series of all its cards.
+	// Each card takes a value of [0,51], meaning they fit in the space of 6 bits.
+	// This means the unique ID for a full deck can be packed into a 39 char string.
+	std::memset(id_scratch_space_.data(), 0, SCRATCH_BUFF_SIZE);
+
+	u8 offset = 0;
+	u8 index = 0;
+	auto pack_bits = [&](uint8_t bits) {
+		uint16_t& edit = reinterpret_cast<uint16_t&>(id_scratch_space_[index]);
+		edit |= bits << offset;
+		// We cut off two bits every time.
+		if (offset == 0) {
+			// When offset wraps to 6, the next write will start on the last two bits of the current byte.
+			offset = 6;
+		} else {
+			offset -= 2;
+			++index;
+		}
+	};
+
+	auto pack_pile_bits = [&](const Pile& pile) {
+		const u8 size = pile.size();
+		for (u8 i = 0; i < size; ++i)
+			pack_bits(static_cast<uint8_t>((toUType(pile[i].getSuit()) * CARDS_PER_SUIT) + pile[i].getRank()));
+	};
+
+	for (const Pile& pile : game_.tableau)
+		pack_pile_bits(pile);
+	for (const Pile& pile : game_.foundation)
+		pack_pile_bits(pile);
+	pack_pile_bits(game_.stock);
+
+	// Get the 39 char string, ignoring the extra buffer byte on the end of the scratch space.
+	const std::string uniqueId(id_scratch_space_.cbegin(), id_scratch_space_.cend() - 1);
+
+	return !seen_states_.insert(uniqueId).second;
 }
 
 void KlondikeSolver::_init() {
