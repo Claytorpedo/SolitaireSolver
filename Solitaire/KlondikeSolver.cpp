@@ -342,7 +342,7 @@ void KlondikeSolver::_undo_move(const Move& m) {
 		Pile::MoveCard(game_.getPile(m.toPile), -1, game_.getPile(m.fromPile), m.stockMovePosition);
 		[[fallthrough]];
 	case MoveType::REPILE_STOCK: // Undo stock repile by moving the stock position back to its previous position.
-		game_.setStockPosition(m.stockPosition);
+		game_.setStockPosition(m.currentStockPosition);
 		break;
 	}
 }
