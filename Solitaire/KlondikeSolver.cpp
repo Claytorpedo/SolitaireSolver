@@ -10,8 +10,8 @@
 using namespace solitaire;
 
 namespace {
-	bool _can_place_card(const Card& place, const Card& other) {
-		return IsRed(place.getSuit()) != IsRed(other.getSuit()) && place.getRank() == other.getRank() - 1;
+	bool _can_place_card(const Card& lower, const Card& higher) {
+		return IsRed(lower.getSuit()) != IsRed(higher.getSuit()) && lower.getRank() == higher.getRank() - 1;
 	}
 	bool _can_move_to_foundation(const Card& card, const std::vector<Pile>& foundation) {
 		const Pile& pile = foundation[toUType(card.getSuit())];
@@ -64,15 +64,15 @@ namespace {
 			return false;
 		const bool wantedSuitIsBlack = IsRed(card.getSuit());
 		const Rank wantedRank = card.getRank() + 1;
-		u8 numAvailableSpots = 0;
+		bool foundOneSpot = false;
 		for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
 			if (tableau[i].hasCards()) {
 				const Card& c = tableau[i].getFromTop();
 				if (wantedSuitIsBlack && !IsRed(c.getSuit()) && wantedRank == c.getRank()) {
-					if (numAvailableSpots >= 1)
+					if (foundOneSpot)
 						return true;
 					firstSpot = i;
-					++numAvailableSpots;
+					foundOneSpot = true;;
 				}
 			}
 		}
@@ -91,13 +91,22 @@ namespace {
 		}
 		return numKingSpaces >= toUType(Suit::TOTAL_SUITS);
 	}
+
+	std::unique_ptr<Move> _find_guaranteed_stock_move(u8 testStockPosition, const KlondikeGame& game) {
+		const Card& c = game.stock[testStockPosition];
+		// Check for a guaranteed moves to the foundation.
+		if (_guaranteed_move_to_foundation(c, game.foundation))
+			return std::make_unique<Move>(Move::Stock(c, game.getStockPosition(), testStockPosition, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }));
+		// Check if it's a king, and see if there are enough tableau spaces to guarantee it has room.
+		if (u8 emptySpot; c.getRank() == RANK_KING && _has_space_for_all_kings(game.tableau, emptySpot))
+			return std::make_unique<Move>(Move::Stock(c, game.getStockPosition(), testStockPosition, PileID{ PileType::TABLEAU, emptySpot }));
+		return nullptr;
+	}
 }
 
 bool KlondikeSolver::_is_card_available(const Card& cardToFind) const {
-	for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
-		if (!game_.tableau[i].hasCards())
-			continue;
-		if (cardToFind == game_.tableau[i].getFromTop())
+	for (const auto& pile : game_.tableau) {
+		if (pile.hasCards() && cardToFind == pile.getFromTop())
 			return true;
 	}
 	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i = game_.getNextInStock(i)) {
@@ -109,31 +118,58 @@ bool KlondikeSolver::_is_card_available(const Card& cardToFind) const {
 
 std::unique_ptr<Move> KlondikeSolver::_find_auto_move() {
 	// Auto moves can change the state of the board and interfere with each other, so only do one at a time.
+	// Find auto-moves in the tableau.
 	for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
 		if (!game_.tableau[i].hasCards())
 			continue;
-		// First, check for a guaranteed moves to the foundation.
+		// Check for a guaranteed move to the foundation.
 		if (const Card& c = game_.tableau[i].getFromTop(); _guaranteed_move_to_foundation(c, game_.foundation)) {
 			const bool flippedCard = game_.tableau[i].size() > 1 && !game_.tableau[i].getFromTop(1).isFaceUp(); // Check if move will reveal a tableau card.
 			return std::make_unique<Move>(Move::Tableau(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }, 1, flippedCard));
-		} else {
-			// Second, look for tableau runs that have two open options in the tableau.
-			u8 runLength;
-			Card topOfRun;
-			_find_top_of_run(game_.tableau[i], runLength, &topOfRun);
-			if (u8 firstSpot; _has_two_available_spots(topOfRun, game_.tableau, firstSpot)) {
-				const bool flippedCard = !game_.tableau[i][0].isFaceUp(); // Moving full run, so will flip if there are still face-down cards.
-				return std::make_unique<Move>(Move::Tableau(topOfRun, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, firstSpot }, runLength, flippedCard));
+		}
 
-			// Last, look for a run with a king, and see if there are enough tableau spaces to guarantee it has room.
-			// Note that while this case can run while the first two also run, it would get an invalid run length.
-			// It can instead be picked up be subsequent calls.
-			} else if (!game_.tableau[i][0].isFaceUp()) { // Don't move a king that is already on an empty spot.
-				if (u8 emptySpot;  topOfRun.getRank() == RANK_KING && _has_space_for_all_kings(game_.tableau, emptySpot))
-					return std::make_unique<Move>(Move::Tableau(topOfRun, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, emptySpot }, runLength, true));
-			}
+		// Look for a run with a king, and see if there are enough tableau spaces to guarantee it has room.
+		u8 runLength;
+		Card topOfRun;
+		_find_top_of_run(game_.tableau[i], runLength, &topOfRun);
+		if (!game_.tableau[i][0].isFaceUp() && topOfRun.getRank() == RANK_KING) { // Don't move a king that is already on an empty spot.
+			if (u8 emptySpot; _has_space_for_all_kings(game_.tableau, emptySpot))
+				return std::make_unique<Move>(Move::Tableau(topOfRun, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, emptySpot }, runLength, true));
 		}
 	}
+	// Find auto-moves in the stock pile. There are some special cases where taking a card won't affect what stock cards are available.
+	if (!game_.stock.hasCards())
+		return nullptr;
+
+	const u8 stockPos = game_.getStockPosition();
+	const u8 stockSize = game_.stock.size();
+
+	if (stockPos == stockSize - 1) {
+		// The last card is always a candidate as it cannot change the stock deal order.
+		return _find_guaranteed_stock_move(stockPos, game_);
+	}
+
+	if ((stockPos + 1) % KlondikeGame::NUM_STOCK_CARD_DRAW == 0 ) { // We are in-run with our deal amount.
+		// We have two possible moves that cannot change the stock deal order: second last and last, as we know by this point we are not the last card.
+		u8 secondLastStockPos = stockPos;
+		for (u8 i = game_.getNextInStock(stockPos); i < stockSize - 1; i = game_.getNextInStock(i))
+			secondLastStockPos = i;
+
+		auto move = _find_guaranteed_stock_move(secondLastStockPos, game_);
+		if (move)
+			return move;
+		return _find_guaranteed_stock_move(stockSize - 1, game_);
+	}
+
+	// Check special case if we are in the last section, but not the last card.
+	u8 cardsAtEnd = stockSize % KlondikeGame::NUM_STOCK_CARD_DRAW;
+	if (cardsAtEnd == 0)
+		cardsAtEnd = KlondikeGame::NUM_STOCK_CARD_DRAW;
+	if (stockSize - stockPos <= cardsAtEnd) {
+		// Can move the current card, but not the last card (because then the current card would no longer be available).
+		return _find_guaranteed_stock_move(stockPos, game_);
+	}
+
 	return nullptr;
 }
 
@@ -231,12 +267,12 @@ bool KlondikeSolver::_is_seen_state() {
 
 	// Build a unique ID for the deck, using the series of all its cards.
 	// Each card takes a value of [0,51], meaning they fit in the space of 6 bits.
-	// This means the unique ID for a full deck can be packed into a 39 char string.
+	// This means the unique ID for a full deck can be packed into a 39 char string, plus 1 char for stock position.
 	std::memset(id_scratch_space_.data(), 0, SCRATCH_BUFF_SIZE);
 
 	u8 offset = 0;
 	u8 index = 0;
-	auto pack_bits = [&](uint8_t bits) {
+	auto pack_bits = [this, &index, &offset](uint8_t bits) {
 		uint16_t& edit = reinterpret_cast<uint16_t&>(id_scratch_space_[index]);
 		edit |= bits << offset;
 		// We cut off two bits every time.
@@ -249,7 +285,7 @@ bool KlondikeSolver::_is_seen_state() {
 		}
 	};
 
-	auto pack_pile_bits = [&](const Pile& pile) {
+	auto pack_pile_bits = [this, &pack_bits](const Pile& pile) {
 		const u8 size = pile.size();
 		for (u8 i = 0; i < size; ++i)
 			pack_bits(static_cast<uint8_t>((toUType(pile[i].getSuit()) * CARDS_PER_SUIT) + pile[i].getRank()));
@@ -261,8 +297,12 @@ bool KlondikeSolver::_is_seen_state() {
 		pack_pile_bits(pile);
 	pack_pile_bits(game_.stock);
 
+	std::string uniqueId;
+	uniqueId.reserve(SCRATCH_BUFF_SIZE);
 	// Get the 39 char string, ignoring the extra buffer byte on the end of the scratch space.
-	const std::string uniqueId(id_scratch_space_.cbegin(), id_scratch_space_.cend() - 1);
+	uniqueId.insert(uniqueId.begin(), id_scratch_space_.cbegin(), id_scratch_space_.cend() - 1);
+	// Set the stock position.
+	uniqueId.push_back(game_.getStockPosition());
 
 	return !seen_states_.insert(uniqueId).second;
 }
