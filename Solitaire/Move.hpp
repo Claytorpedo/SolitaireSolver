@@ -27,16 +27,16 @@ namespace solitaire {
 
 	class Move { // Holds information for a move, as well as what's needed to undo that move.
 	public:
-		const Card movedCard;
-		const PileID fromPile;
-		const PileID toPile;
+		Card movedCard;
+		PileID fromPile;
+		PileID toPile;
 		union {
-			const u8 cardsToMove;
-			const u8 currentStockPosition; // If type is STOCK or REPILE_STOCK, indicates pre-move position.
+			u8 cardsToMove;
+			u8 currentStockPosition; // If type is STOCK or REPILE_STOCK, indicates pre-move position.
 		};
-		const u8 stockMovePosition = 0; // If type is STOCK, indicates position in stock to move from.
-		const MoveType type;
-		const bool flippedCard = false; // Whether the move caused a card to be flipped.
+		u8 stockMovePosition = 0; // If type is STOCK, indicates position in stock to move from.
+		MoveType type;
+		bool flippedCard = false; // Whether the move caused a card to be flipped.
 
 		static Move TableauPartial(const Card& movedCard, PileID fromPile, PileID toPile, u8 cardsToMove); // Move a partial run.
 		static Move Tableau(const Card& movedCard, PileID fromPile, PileID toPile, u8 cardsToMove, bool flippedCard);  // Move one or more cards from a tableau pile to another pile.
@@ -44,9 +44,9 @@ namespace solitaire {
 		static Move RepileStock(u8 stockPosition); // Repile/reset the stock.
 
 	private:
-		explicit Move(const Card& movedCard, PileID fromPile, PileID toPile, u8 cardsToMove, MoveType type, bool flippedCard)
+		constexpr explicit Move(const Card& movedCard, PileID fromPile, PileID toPile, u8 cardsToMove, MoveType type, bool flippedCard) noexcept
 			: movedCard(movedCard), fromPile(fromPile), toPile(toPile), cardsToMove(cardsToMove), type(type), flippedCard(flippedCard) {}
-		explicit Move(const Card& movedCard, PileID fromPile, PileID toPile, u8 stockPosition, u8 stockMovePosition, MoveType type)
+		constexpr explicit Move(const Card& movedCard, PileID fromPile, PileID toPile, u8 stockPosition, u8 stockMovePosition, MoveType type) noexcept
 			: movedCard(movedCard), fromPile(fromPile), toPile(toPile), currentStockPosition(stockPosition), stockMovePosition(stockMovePosition), type(type) {}
 	};
 
