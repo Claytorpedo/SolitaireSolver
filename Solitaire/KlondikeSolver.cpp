@@ -10,6 +10,21 @@
 using namespace solitaire;
 
 namespace {
+
+	// -------------------------------- Move Strategy -----------------------------------------------
+	// Numbers are padded such that if their base priority is EG 100, then they can be subtracted from to make them higher priority.
+	enum class Priority : u32 {
+		REVEAL = 100,                // Moves that reveal a card. Number indicates how many cards are flipped in the stack (Klondike has max 6).
+		CLEAR_WITH_KING = 200,       // Clearning an empty board spot when there is a king available to occupy it.
+		STOCK = 300,                 // Moves from stock pile (to tableau or foundation). Higher priority towards the end of the stock pile.
+		TABLEAU_TO_FOUNDATION = 400,
+		REPILE_STOCK = 400,
+		PARTIAL = 600,               // Intra-tableau moves that don't reveal a card or clear a space.
+		FOUNDATION_TO_TABLEAU = 700,
+	};
+
+	// ----------------------------------------------------------------------------------------------
+
 	bool _can_place_card(const Card& lower, const Card& higher) {
 		return IsRed(lower.getSuit()) != IsRed(higher.getSuit()) && lower.getRank() == higher.getRank() - 1;
 	}
@@ -30,7 +45,7 @@ namespace {
 		return _can_move_to_foundation(card, foundation) && card.getRank() <= minRank + 2;
 	}
 	// Find first face-up card for the pile. Returns whether a run was found (false if pile has no cards).
-	bool _find_top_of_run(const Pile& pile, u8& out_run_length, Card* optional_out_card=nullptr) {
+	bool _find_top_of_run(const Pile& pile, u8& out_run_length, Card* optional_out_card = nullptr) {
 		for (u8 i = 0; i < pile.size(); ++i) {
 			if (pile[i].isFaceUp()) {
 				if (optional_out_card)
@@ -104,6 +119,20 @@ namespace {
 	}
 }
 
+bool KlondikeSolver::_is_king_available() const {
+	Card card;
+	u8 unused;
+	for (const auto& pile : game_.tableau) {
+		if (_find_top_of_run(pile, unused, &card) && card.getRank() == RANK_KING)
+			return true;
+	}
+	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i = game_.getNextInStock(i)) {
+		if (game_.stock[i].getRank() == RANK_KING)
+			return true;
+	}
+	return false;
+}
+
 bool KlondikeSolver::_is_card_available(const Card& cardToFind) const {
 	for (const auto& pile : game_.tableau) {
 		if (pile.hasCards() && cardToFind == pile.getFromTop())
@@ -173,24 +202,25 @@ std::unique_ptr<Move> KlondikeSolver::_find_auto_move() {
 	return nullptr;
 }
 
-void KlondikeSolver::_find_moves_to_foundation(MoveList& availableMoves) {
+void KlondikeSolver::_find_moves_to_foundation(PriorityMoveList& availableMoves) {
 	for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
 		if (!game_.tableau[i].hasCards())
 			continue;
 		const Card& c = game_.tableau[i].getFromTop();
 		if (_can_move_to_foundation(c, game_.foundation)) {
 			const bool flippedCard = game_.tableau[i].size() > 1 && !game_.tableau[i].getFromTop(1).isFaceUp(); // Check if move will reveal a tableau card.
-			availableMoves.push_back(Move::Tableau(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }, 1, flippedCard));
+			const u32 priority = flippedCard ? toUType(Priority::REVEAL) - (game_.tableau[i].size() - 1) : toUType(Priority::TABLEAU_TO_FOUNDATION);
+			availableMoves.emplace_back(PriorityMove{ Move::Tableau(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }, 1, flippedCard), priority });
 		}
 	}
 	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i = game_.getNextInStock(i)) {
 		const Card& c = game_.stock[i];
 		if (_can_move_to_foundation(c, game_.foundation))
-			availableMoves.push_back(Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }));
+			availableMoves.emplace_back(PriorityMove{ Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }), toUType(Priority::STOCK) - i });
 	}
 }
 
-void KlondikeSolver::_find_full_run_moves(MoveList& availableMoves) {
+void KlondikeSolver::_find_full_run_moves(PriorityMoveList& availableMoves) {
 	for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
 		const Pile& fromPile = game_.tableau[i];
 		Card card;
@@ -201,12 +231,16 @@ void KlondikeSolver::_find_full_run_moves(MoveList& availableMoves) {
 		u8 toPile;
 		if (!_find_tableau_to_tableau_move(card, game_.tableau, i, toPile))
 			continue;
-		const bool flippedCard = game_.tableau[i].size() > runLength;
-		availableMoves.push_back(Move::Tableau(card, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, toPile }, runLength, flippedCard));
+		const u32 remainingCards = game_.tableau[i].size() - runLength;
+		if (remainingCards > 0) {
+			availableMoves.emplace_back(PriorityMove{ Move::Tableau(card, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, toPile }, runLength, true), toUType(Priority::REVEAL) - remainingCards });
+		} else if (_is_king_available()) {
+			availableMoves.emplace_back(PriorityMove{ Move::Tableau(card, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, toPile }, runLength, false), toUType(Priority::CLEAR_WITH_KING) });
+		}
 	}
 }
 
-void KlondikeSolver::_find_partial_run_moves(MoveList& availableMoves) {
+void KlondikeSolver::_find_partial_run_moves(PriorityMoveList& availableMoves) {
 	for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
 		const Pile& fromPile = game_.tableau[i];
 		u8 runLength;
@@ -228,42 +262,43 @@ void KlondikeSolver::_find_partial_run_moves(MoveList& availableMoves) {
 			// 1. The card being uncovered can be moved to the foundation.
 			// 2. There is another card that can be moved onto the uncovered card.
 			if (_can_move_to_foundation(fromPile.getFromTop(k), game_.foundation) || _is_card_available(Card(GetSameColourOtherSuit(c.getSuit()), c.getRank()))) {
-				availableMoves.push_back(Move::TableauPartial(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, toPile }, k));
+				availableMoves.emplace_back(PriorityMove{ Move::TableauPartial(c, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, toPile }, k), toUType(Priority::PARTIAL) });
 			}
 		}
 	}
 }
 
-void KlondikeSolver::_find_stock_to_tableau_moves(MoveList& availableMoves) {
+void KlondikeSolver::_find_stock_to_tableau_moves(PriorityMoveList& availableMoves) {
 	for (u8 i = game_.getStockPosition(); i < game_.stock.size(); i = game_.getNextInStock(i)) {
 		const Card& c = game_.stock[i];
 		for (u8 k = 0; k < KlondikeGame::NUM_TABLEAU_PILES; ++k) {
 			if (!game_.tableau[k].hasCards()) {
 				if (c.getRank() == RANK_KING) // Move king down to empty spot.
-					availableMoves.push_back(Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::TABLEAU, k }));
+					availableMoves.emplace_back(PriorityMove{ Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::TABLEAU, k }), toUType(Priority::STOCK) - i });
 			} else if (_can_place_card(c, game_.tableau[k].getFromTop())) { // Place card on a tableau pile.
-				availableMoves.push_back(Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::TABLEAU, k }));
+				availableMoves.emplace_back(PriorityMove{ Move::Stock(c, game_.getStockPosition(), i, PileID{ PileType::TABLEAU, k }), toUType(Priority::STOCK) - i });
 			}
 		}
 	}
 }
 
-bool KlondikeSolver::_find_available_moves(MoveList& availableMoves) {
-	// Order here sets priority.
-	_find_full_run_moves(availableMoves);
-	_find_partial_run_moves(availableMoves);
-	_find_stock_to_tableau_moves(availableMoves);
-	_find_moves_to_foundation(availableMoves);
+KlondikeSolver::PriorityMoveList KlondikeSolver::_find_available_moves() {
+	PriorityMoveList moves;
+	_find_full_run_moves(moves);
+	_find_partial_run_moves(moves);
+	_find_stock_to_tableau_moves(moves);
+	_find_moves_to_foundation(moves);
 
 	if (game_.isStockDirty()) // If we can shuffle the stock, do so last.
-		availableMoves.push_back(Move::RepileStock(game_.getStockPosition()));
+		moves.emplace_back(PriorityMove{ Move::RepileStock(game_.getStockPosition()), toUType(Priority::REPILE_STOCK) });
 
-	return !availableMoves.empty();
+	std::sort(moves.begin(), moves.end(), [](const auto& lhs, const auto& rhs) { return lhs.priority < rhs.priority; });
+	return moves;
 }
 
 bool KlondikeSolver::_is_seen_state() {
 	if (!move_sequence_.empty() && move_sequence_.back().type == MoveType::REPILE_STOCK)
-		return false; // Don't store new state on repile stock moves.
+		return false; // Don't bother storing new state on repile stock moves.
 
 	// Build a unique ID for the deck, using the series of all its cards.
 	// Each card takes a value of [0,51], meaning they fit in the space of 6 bits.
@@ -319,8 +354,7 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 	if (_is_seen_state())
 		return GameResult::Result::LOSE;
 
-	MoveList autoMoves, availableMoves;
-
+	MoveList autoMoves;
 	while (std::unique_ptr<Move> m = _find_auto_move()) {
 		autoMoves.push_back(*m.get());
 		_do_move(*m.get());
@@ -332,9 +366,9 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 	if (states_tried_ != 0 && maxStates != 0 && states_tried_ >= maxStates)
 		return GameResult::Result::UNKNOWN; // Ran out of allowed states to try.
 
-	if (_find_available_moves(availableMoves)) {
-		for (const Move& m : availableMoves) {
-			_do_move(m);
+	if (PriorityMoveList moves = _find_available_moves(); !moves.empty()) {
+		for (const auto& priMove : moves) {
+			_do_move(priMove.move);
 			++states_tried_;
 
 			if (false)
@@ -344,7 +378,7 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 			if (r != GameResult::Result::LOSE)
 				return r;
 
-			_undo_move(m);
+			_undo_move(priMove.move);
 		}
 	}
 

@@ -28,7 +28,7 @@ namespace solitaire {
 	public:
 		const u64 maxStates = 0; // Max states == 0 -> search until solved.
 
-		KlondikeSolver(u64 maxStates = 0) : maxStates(maxStates)  {};
+		KlondikeSolver(u64 maxStates = 0) noexcept : maxStates(maxStates) {};
 
 		GameResult solve();
 
@@ -41,8 +41,14 @@ namespace solitaire {
 		static void doMove(KlondikeGame& game, const Move& move);
 
 	private:
+		struct PriorityMove {
+			Move move;
+			u32 priority;
+		};
+		using PriorityMoveList = std::vector<PriorityMove>;
+
 		void _init();
-		// Is if a card is available for a move.
+		bool _is_king_available() const;
 		bool _is_card_available(const Card& cardToFind) const;
 		// Returns true if the game has been won.
 		GameResult::Result _solve_recursive(u32 depth);
@@ -50,19 +56,14 @@ namespace solitaire {
 		void _do_move(const Move& m);
 		void _undo_move(const Move& m);
 
-		// Moves that move a full run (flip a tableau card or clear an empty tableau spot).
-		void _find_full_run_moves(MoveList& availableMoves);
-		// Moves to the foundation.
-		void _find_moves_to_foundation(MoveList& availableMoves);
-		// Moves from stock to tableau.
-		void _find_stock_to_tableau_moves(MoveList& availableMoves);
-		// Moves of partial runs from one tableau pile to another.
-		void _find_partial_run_moves(MoveList& availableMoves);
+		void _find_full_run_moves(PriorityMoveList& availableMoves);
+		void _find_moves_to_foundation(PriorityMoveList& availableMoves);
+		void _find_stock_to_tableau_moves(PriorityMoveList& availableMoves);
+		void _find_partial_run_moves(PriorityMoveList& availableMoves);
 
-		// Returns true if any auto-move (guaranteed move) was found.
 		std::unique_ptr<Move> _find_auto_move();
 		// Returns true if any available moves were found.
-		bool _find_available_moves(MoveList& availableMoves);
+		PriorityMoveList _find_available_moves();
 
 		bool _is_seen_state();
 
