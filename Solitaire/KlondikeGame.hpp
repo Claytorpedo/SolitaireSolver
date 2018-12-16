@@ -21,7 +21,7 @@ namespace solitaire {
 		static constexpr u8 NUM_STOCK_CARD_DRAW = 3; // Number of cards to deal from the stock at a time.
 
 		KlondikeGame() = default;
-		KlondikeGame(u64 seed) : seed_(seed) {}
+		KlondikeGame(u64 seed) noexcept : seed_(seed) {}
 
 		void setUpGame();
 
@@ -48,6 +48,6 @@ namespace solitaire {
 		Pile stock{ PileType::STOCK };
 
 	private:
-		u8 stock_position_;
+		u8 stock_position_{ 0 };
 	};
 }
