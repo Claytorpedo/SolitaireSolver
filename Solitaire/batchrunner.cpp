@@ -21,32 +21,7 @@ using Clock = std::chrono::high_resolution_clock;
 using namespace solitaire;
 
 namespace {
-
-	constexpr u64 FIRST_SEED = 300000;
-
-	constexpr u32 NUM_BATCHES = 100;
-	constexpr u32 BATCH_SIZE = 1000;
-	constexpr u64 MAX_STATES = 10000000;
-	constexpr bool WRITE_GAMES = false;
-
-	const std::string RESULTS_DIR = "./results/";
-	const std::string SOLUTIONS_DIR = RESULTS_DIR + "/solutions/";
-	const std::string WIN_FILE = RESULTS_DIR + "winning_seeds.txt";
-	const std::string LOSE_FILE = RESULTS_DIR + "losing_seeds.txt";
-	const std::string UNKNOWN_FILE = RESULTS_DIR + "unknown_seeds.txt";
-	const std::string STATS_FILE = RESULTS_DIR + "stats.txt";
-
-	constexpr Threadpool::thread_num MAX_THREADS = 8;
-	constexpr auto NUM_SOLVERS = MAX_THREADS;
-	constexpr u64 unsigned_ceil(float f) {
-		u64 n = static_cast<u64>(f);
-		return f == static_cast<float>(n) ? n : n + 1;
-	}
-	constexpr u64 SEEDS_PER_TASK = unsigned_ceil(BATCH_SIZE / static_cast<float>(NUM_SOLVERS));
-
-	std::atomic<u64> s_seedsRun = 0;
-	Threadpool s_pool(MAX_THREADS);
-	std::vector<KlondikeSolver> s_solvers(NUM_SOLVERS, MAX_STATES);
+	constexpr std::string_view SOLUTIONS_SUBFOLDER = "/solutions/";
 
 	struct Stats {
 		u64 startSeed{ 0 };
@@ -63,6 +38,11 @@ namespace {
 		std::chrono::seconds runTime{ 0 };
 	};
 
+	constexpr u64 _unsigned_ceil(float f) noexcept {
+		u64 n = static_cast<u64>(f);
+		return f == static_cast<float>(n) ? n : n + 1;
+	}
+
 	// Pad input to a given width.
 	template<typename T>
 	struct PadWrite {
@@ -77,22 +57,21 @@ namespace {
 		u32 precision;
 	};
 
-	bool _startup() {
-		if (_mkdir(RESULTS_DIR.c_str()) != 0 && errno != EEXIST) {
+	bool _startup(const std::string& resultsDir) {
+		if (_mkdir(resultsDir.c_str()) != 0 && errno != EEXIST) {
 			std::cerr << "Failed to create results directory.\n";
 			return false;
 		}
-		if (_mkdir(SOLUTIONS_DIR.c_str()) != 0 && errno != EEXIST) {
+		if (_mkdir((resultsDir + std::string(SOLUTIONS_SUBFOLDER)).c_str()) != 0 && errno != EEXIST) {
 			std::cerr << "Failed to create solutions directory.\n";
 			return false;
 		}
-
 		return true;
 	}
 
-	void _write_solution_file(const GameResult& result) {
+	void _write_solution_file(std::string_view resultsDir, const GameResult& result) {
 		std::stringstream fileName;
-		fileName << SOLUTIONS_DIR << PadWrite(result.seed) << ".txt";
+		fileName << resultsDir << SOLUTIONS_SUBFOLDER << PadWrite(result.seed) << ".txt";
 		std::ofstream solutionFile(fileName.str(), std::ios::trunc);
 
 		// Print off moves list.
@@ -113,8 +92,8 @@ namespace {
 		}
 	}
 
-	void _write_stats(const Stats& stats) {
-		std::ofstream statsFile(STATS_FILE, std::ios::app);
+	void _write_stats(const std::string& resultsDir, const Stats& stats) {
+		std::ofstream statsFile(resultsDir + "stats.txt", std::ios::app);
 		statsFile << "Ran from seed    " << PadWrite(stats.startSeed) << " to seed " << PadWrite(stats.endSeed) << "\n";
 		statsFile << "Total games run: " << PadWrite(stats.totalGames) << "\n";
 		statsFile << "Wins:            " << PadWrite(stats.wins) << " (" << PadWrite(stats.wins / static_cast<float>(stats.totalGames) * 100, ' ', 2) << "%)\n";
@@ -130,17 +109,17 @@ namespace {
 		statsFile << "********\n\n";
 	}
 
-	void _write_results(const std::vector<GameResult>& results) {
-		std::ofstream winFile(WIN_FILE, std::ios::app);
-		std::ofstream loseFile(LOSE_FILE, std::ios::app);
-		std::ofstream unknownFile(UNKNOWN_FILE, std::ios::app);
+	void _write_results(const std::vector<GameResult>& results, const std::string& resultsDir, bool writeSolutions) {
+		std::ofstream winFile(resultsDir + "winning_seeds.txt", std::ios::app);
+		std::ofstream loseFile(resultsDir + "losing_seeds.txt", std::ios::app);
+		std::ofstream unknownFile(resultsDir + "unknown_seeds.txt", std::ios::app);
 
 		for (const GameResult& result : results) {
 			switch (result.result) {
 			case(GameResult::Result::WIN):
 				winFile << PadWrite(result.seed, '0') << " (positions tried: " << PadWrite(result.positionsTried) << ", solution length: " << PadWrite(result.solution.size()) << ")\n";
-				if (WRITE_GAMES)
-					_write_solution_file(result);
+				if (writeSolutions)
+					_write_solution_file(resultsDir, result);
 				break;
 			case(GameResult::Result::LOSE):
 				loseFile << PadWrite(result.seed, '0') << " (positions tried: " << PadWrite(result.positionsTried) << ")\n";
@@ -190,7 +169,7 @@ namespace {
 		stats.endSeed += results.size();
 	}
 
-	std::vector<GameResult> _batch_task(KlondikeSolver& solver, u64 startSeed, u64 numSeeds) {
+	std::vector<GameResult> _batch_task(KlondikeSolver& solver, u64 startSeed, u64 numSeeds, std::atomic<u32>& seedsRun) {
 		std::vector<GameResult> results;
 		results.reserve(static_cast<int>(numSeeds));
 
@@ -198,44 +177,50 @@ namespace {
 		for (u64 i = startSeed; i < seedEnd; ++i) {
 			solver.setSeed(i);
 			results.push_back(solver.solve());
-			++s_seedsRun;
+			++seedsRun;
 		}
 		return results;
 	}
 }
 
-bool batchrunner::run() {
-	if (!_startup())
+bool BatchRunner::run() {
+	if (!_startup(options_.outputDirectory))
 		return false;
 
+	const u64 seedsPerTask = _unsigned_ceil(options_.batchSize / static_cast<float>(options_.numSolvers));
+
+	std::atomic<u32> seedsRun = 0;
+	Threadpool pool(options_.numSolvers);
+	std::vector<KlondikeSolver> solvers(options_.numSolvers, options_.maxStates);
+
 	std::vector<std::future<std::vector<GameResult>>> allResults;
-	allResults.reserve(NUM_SOLVERS);
+	allResults.reserve(options_.numSolvers);
 
 	Stats stats;
-	stats.startSeed = FIRST_SEED;
-	stats.endSeed = FIRST_SEED;
+	stats.endSeed = stats.startSeed = options_.firstSeed;
+
+	u64 startSeed = options_.firstSeed;
 	const auto timeStart = Clock::now();
-	u64 startSeed = FIRST_SEED;
-	for (u32 i = 0; i < NUM_BATCHES; ++i) {
-		for (auto& solver : s_solvers) {
-			allResults.push_back(s_pool.add(_batch_task, solver, startSeed, SEEDS_PER_TASK));
-			startSeed += SEEDS_PER_TASK;
+	for (u32 i = 0; i < options_.numBatches; ++i) {
+		for (auto& solver : solvers) {
+			allResults.push_back(pool.add(_batch_task, std::ref(solver), startSeed, seedsPerTask, std::ref(seedsRun)));
+			startSeed += seedsPerTask;
 		}
 
-		while (!s_pool.isIdle()) {
+		while (!pool.isIdle()) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
-			std::cout << "\rSeeds Run: " << PadWrite<u64>(s_seedsRun);
+			std::cout << "\rSeeds Run: " << PadWrite<u32>(seedsRun);
 		}
 
 		std::cout << "\nBatch done. Writing results.\n";
 
 		for (auto& results : allResults) {
 			auto gameResults = results.get();
-			_write_results(gameResults);
+			_write_results(gameResults, options_.outputDirectory, options_.writeGameSolutions);
 			_update_stats(gameResults, stats);
 		}
 		stats.runTime = std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - timeStart);
-		_write_stats(stats);
+		_write_stats(options_.outputDirectory, stats);
 
 		allResults.clear();
 	}

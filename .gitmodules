@@ -1,3 +1,6 @@
 [submodule "Solitaire/threadpool"]
 	path = Solitaire/threadpool
 	url = git@github.com:Claytorpedo/threadpool.git
+[submodule "CmdParser"]
+	path = Solitaire/CmdParser
+	url = git@github.com:Claytorpedo/CmdParser.git
