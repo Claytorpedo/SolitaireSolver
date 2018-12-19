@@ -347,7 +347,7 @@ void KlondikeSolver::_init() {
 	seen_states_.clear();
 	move_sequence_.clear();
 	partial_run_move_cards_.clear();
-	seen_states_.reserve( static_cast<unsigned int>(std::min(maxStates, static_cast<u64>(seen_states_.max_size()))));
+	seen_states_.reserve( static_cast<unsigned int>(maxStates == 0 ? 10'000'000 : std::min(maxStates, static_cast<u64>(seen_states_.max_size()))));
 }
 
 GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
