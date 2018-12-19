@@ -125,7 +125,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\CmdParser\CmdParser.hpp" />
     <ClInclude Include="batchrunner.hpp" />
     <ClInclude Include="Deck.hpp" />
     <ClInclude Include="KlondikeGame.hpp" />
