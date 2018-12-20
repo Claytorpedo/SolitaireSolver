@@ -25,8 +25,8 @@ namespace solitaire {
 
 		BatchOptions getOptions() const { return options_; }
 		void         setOptions(BatchOptions options) { options_ = std::move(options); }
-
-		bool         run(); // Returns false if there is an error.
+		// Returns false if there is an error.
+		bool         run(bool printOptions = true);
 
 	private:
 		BatchOptions options_;

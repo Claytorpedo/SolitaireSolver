@@ -35,6 +35,7 @@ namespace {
 		float lostGamesAveragePositionsTried{ 0 };
 		float averageSolutionDepth{ 0 };
 		u64 maxSolutionDepth{ 0 };
+		u64 minSolutionDepth{ std::numeric_limits<u64>::max() };
 		std::chrono::seconds runTime{ 0 };
 	};
 
@@ -103,7 +104,8 @@ namespace {
 		statsFile << "Average positions tried for wins:            " << PadWrite(stats.wonGamesAveragePositionsTried) << "\n";
 		statsFile << "Average positions tried for losses:          " << PadWrite(stats.lostGamesAveragePositionsTried) << "\n";
 		statsFile << "Average positions tried for completed games: " << PadWrite(stats.completedGamesAveragePositionsTried) << "\n";
-		statsFile << "Average solution depth: " << PadWrite(stats.averageSolutionDepth) << "\n";
+		statsFile << "Average solution depth: " << PadWrite(stats.averageSolutionDepth)
+			<< " (min: " << PadWrite(stats.minSolutionDepth, ' ', 3) << ", max: " << PadWrite(stats.maxSolutionDepth, ' ', 3) << ")\n";
 		statsFile << "Total run time: " << PadWrite(stats.runTime.count()) << "s\n";
 
 		statsFile << "********\n\n";
@@ -143,6 +145,8 @@ namespace {
 				solutionLengths += r.solution.size();
 				if (r.solution.size() > stats.maxSolutionDepth)
 					stats.maxSolutionDepth = r.solution.size();
+				if (r.solution.size() < stats.minSolutionDepth)
+					stats.minSolutionDepth = r.solution.size();
 				break;
 			case(GameResult::Result::LOSE):
 				++losses;
@@ -183,11 +187,23 @@ namespace {
 	}
 }
 
-bool BatchRunner::run() {
+bool BatchRunner::run(bool printOptions) {
 	if (!_startup(options_.outputDirectory))
 		return false;
 
 	const u64 seedsPerTask = _unsigned_ceil(options_.batchSize / static_cast<float>(options_.numSolvers));
+
+	if (printOptions) {
+		std::cout << "Running batches with options:\n";
+		std::cout << "First seed: " << PadWrite(options_.firstSeed) << " (last seed: " << (options_.firstSeed + options_.numSolvers * seedsPerTask * options_.numBatches - 1) << ")\n";
+		std::cout << "Batches:    " << PadWrite(options_.numBatches) << "\n";
+		std::cout << "Batch Size: " << PadWrite(options_.batchSize) << "\n";
+		std::cout << "Max States: " << PadWrite(options_.maxStates) << "\n";
+		std::cout << "Solvers:    " << PadWrite(static_cast<u32>(options_.numSolvers)) << " (seeds per solver per batch: " << seedsPerTask << ")\n";
+		std::cout << "Results directory: " << options_.outputDirectory << "\n";
+		std::cout << (options_.writeGameSolutions ? "Writing out game solutions.\n" : "Not writing out game solutions.\n");
+		std::cout << std::endl;
+	}
 
 	std::atomic<u32> seedsRun = 0;
 	Threadpool pool(options_.numSolvers);
@@ -197,7 +213,8 @@ bool BatchRunner::run() {
 	allResults.reserve(options_.numSolvers);
 
 	Stats stats;
-	stats.endSeed = stats.startSeed = options_.firstSeed;
+	stats.startSeed = options_.firstSeed;
+	stats.endSeed = options_.firstSeed - 1;
 
 	u64 startSeed = options_.firstSeed;
 	const auto timeStart = Clock::now();
