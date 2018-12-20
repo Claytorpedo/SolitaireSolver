@@ -12,7 +12,7 @@ namespace solitaire {
 		u32 numBatches{ 10 };
 		u32 batchSize{ 100 };
 		u64 maxStates{ 1000000 };
-		u16 numSolvers{ 4 };
+		u8 numSolvers{ 4 };
 
 		bool writeGameSolutions{ false };
 		std::string outputDirectory{ "./results/" };
