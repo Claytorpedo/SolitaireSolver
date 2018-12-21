@@ -20,7 +20,6 @@ namespace {
 		TABLEAU_TO_FOUNDATION = 400,
 		REPILE_STOCK = 400,
 		PARTIAL = 600,               // Intra-tableau moves that don't reveal a card or clear a space.
-		FOUNDATION_TO_TABLEAU = 700,
 	};
 
 	// ----------------------------------------------------------------------------------------------
