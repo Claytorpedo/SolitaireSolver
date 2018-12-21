@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <numeric>
+#include <mutex>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -173,17 +174,32 @@ namespace {
 		stats.endSeed += results.size();
 	}
 
-	std::vector<GameResult> _batch_task(KlondikeSolver& solver, u64 startSeed, u64 numSeeds, std::atomic<u32>& seedsRun) {
-		std::vector<GameResult> results;
-		results.reserve(static_cast<int>(numSeeds));
-
-		const u64 seedEnd = startSeed + numSeeds;
-		for (u64 i = startSeed; i < seedEnd; ++i) {
-			solver.setSeed(i);
-			results.push_back(solver.solve());
-			++seedsRun;
+	void _batch_task(KlondikeSolver& solver, std::mutex& writeMutex, u64& seedIndex, u64 lastSeedInBatch, bool& doneBatch, GameResults& workingResults, std::atomic<u32>& seedsRun) {
+		u64 seedToRun = 0;
+		{
+			std::lock_guard<std::mutex> lock(writeMutex);
+			if (doneBatch)
+				return;
+			seedToRun = seedIndex++;
+			if (seedToRun == lastSeedInBatch) {
+				doneBatch = true;
+			}
 		}
-		return results;
+		while (true) {
+			solver.setSeed(seedToRun);
+			auto result = solver.solve();
+			++seedsRun;
+			{
+				std::lock_guard<std::mutex> lock(writeMutex);
+				workingResults.emplace_back(std::move(result));
+				if (doneBatch)
+					return;
+				seedToRun = seedIndex++;
+				if (seedToRun == lastSeedInBatch) {
+					doneBatch = true;
+				}
+			}
+		}
 	}
 }
 
@@ -191,15 +207,13 @@ bool BatchRunner::run(bool printOptions) {
 	if (!_startup(options_.outputDirectory))
 		return false;
 
-	const u64 seedsPerTask = _unsigned_ceil(options_.batchSize / static_cast<float>(options_.numSolvers));
-
 	if (printOptions) {
 		std::cout << "Running batches with options:\n";
-		std::cout << "First seed: " << PadWrite(options_.firstSeed) << " (last seed: " << (options_.firstSeed + options_.numSolvers * seedsPerTask * options_.numBatches - 1) << ")\n";
+		std::cout << "First seed: " << PadWrite(options_.firstSeed) << " (last seed: " << (options_.firstSeed + static_cast<u64>(options_.batchSize) * options_.numBatches - 1) << ")\n";
 		std::cout << "Batches:    " << PadWrite(options_.numBatches) << "\n";
 		std::cout << "Batch Size: " << PadWrite(options_.batchSize) << "\n";
 		std::cout << "Max States: " << PadWrite(options_.maxStates) << "\n";
-		std::cout << "Solvers:    " << PadWrite(static_cast<u32>(options_.numSolvers)) << " (seeds per solver per batch: " << seedsPerTask << ")\n";
+		std::cout << "Solvers:    " << PadWrite(static_cast<u32>(options_.numSolvers)) << ")\n";
 		std::cout << "Results directory: " << options_.outputDirectory << "\n";
 		std::cout << (options_.writeGameSolutions ? "Writing out game solutions.\n" : "Not writing out game solutions.\n");
 		std::cout << std::endl;
@@ -209,38 +223,54 @@ bool BatchRunner::run(bool printOptions) {
 	Threadpool pool(options_.numSolvers);
 	std::vector<KlondikeSolver> solvers(options_.numSolvers, options_.maxStates);
 
-	std::vector<std::future<std::vector<GameResult>>> allResults;
-	allResults.reserve(options_.numSolvers);
+	std::vector<std::future<void>> threads;
+	threads.reserve(options_.numSolvers);
+
+	std::mutex updateResultsMutex;
+	std::vector<GameResult> workingResults, writingResults;
 
 	Stats stats;
 	stats.startSeed = options_.firstSeed;
-	stats.endSeed = options_.firstSeed - 1;
+	stats.endSeed = options_.firstSeed - 1; // Still safe if first seed is 0. We'll just wrap back around.
 
-	u64 startSeed = options_.firstSeed;
 	const auto timeStart = Clock::now();
-	for (u32 i = 0; i < options_.numBatches; ++i) {
-		for (auto& solver : solvers) {
-			allResults.push_back(pool.add(_batch_task, std::ref(solver), startSeed, seedsPerTask, std::ref(seedsRun)));
-			startSeed += seedsPerTask;
+	auto writeResults = [options = options_, timeStart, &stats, &writingResults] {
+		if (!writingResults.empty()) {
+			std::sort(writingResults.begin(), writingResults.end(), [](const auto& lhs, const auto& rhs) { return lhs.seed < rhs.seed; });
+			_write_results(writingResults, options.outputDirectory, options.writeGameSolutions);
+			_update_stats(writingResults, stats);
+			stats.runTime = std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - timeStart);
+			_write_stats(options.outputDirectory, stats);
+			writingResults.clear();
 		}
+	};
+
+	u64 seedIndex = options_.firstSeed;
+	bool doneBatch = false;
+	u64 lastSeedInBatch = seedIndex - 1;
+	for (u32 i = 0; i < options_.numBatches; ++i) {
+		workingResults.reserve(options_.batchSize);
+		lastSeedInBatch += options_.batchSize;
+		doneBatch = false;
+		for (auto& solver : solvers)
+			threads.push_back(pool.add(_batch_task, std::ref(solver), std::ref(updateResultsMutex), std::ref(seedIndex), lastSeedInBatch, std::ref(doneBatch), std::ref(workingResults), std::ref(seedsRun)));
+
+		writeResults();
 
 		while (!pool.isIdle()) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
 			std::cout << "\rSeeds Run: " << PadWrite<u32>(seedsRun);
 		}
 
+		for (auto& thread : threads)
+			thread.get();
+		threads.clear();
+
 		std::cout << "\nBatch done. Writing results.\n";
-
-		for (auto& results : allResults) {
-			auto gameResults = results.get();
-			_write_results(gameResults, options_.outputDirectory, options_.writeGameSolutions);
-			_update_stats(gameResults, stats);
-		}
-		stats.runTime = std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - timeStart);
-		_write_stats(options_.outputDirectory, stats);
-
-		allResults.clear();
+		writingResults = std::move(workingResults);
+		workingResults.clear();
 	}
+	writeResults();
 	std::cout << "All batches completed.\n";
 	std::cout << "Time: " << stats.runTime.count() << " seconds\n";
 
