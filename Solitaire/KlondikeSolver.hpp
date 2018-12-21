@@ -18,11 +18,12 @@ namespace solitaire {
 			LOSE,
 			UNKNOWN,
 		};
-		const u64 positionsTried;
-		const u64 seed;
-		const MoveList solution;
-		const Result result;
+		u64 positionsTried;
+		u64 seed;
+		MoveList solution;
+		Result result;
 	};
+	using GameResults = std::vector<GameResult>;
 
 	class KlondikeSolver {
 	public:
