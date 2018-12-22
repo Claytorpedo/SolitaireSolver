@@ -207,24 +207,40 @@ bool BatchRunner::run(bool printOptions) {
 	if (!_startup(options_.outputDirectory))
 		return false;
 
+	const unsigned int numSolvers = options_.numSolvers > 0 ? options_.numSolvers : std::thread::hardware_concurrency();
+	const u32 numBatches = options_.numBatches > 0 ? options_.numBatches : std::numeric_limits<u32>::max();
+
 	if (printOptions) {
 		std::cout << "Running batches with options:\n";
-		std::cout << "First seed: " << PadWrite(options_.firstSeed) << " (last seed: " << (options_.firstSeed + static_cast<u64>(options_.batchSize) * options_.numBatches - 1) << ")\n";
-		std::cout << "Batches:    " << PadWrite(options_.numBatches) << "\n";
+		std::cout << "First seed: " << PadWrite(options_.firstSeed);
+		if (options_.numBatches > 0 )
+			std::cout << " (last seed: " << (options_.firstSeed + static_cast<u64>(options_.batchSize) * options_.numBatches - 1) << ")";
+		std::cout << "\n";
+		std::cout << "Batches:    " << PadWrite(options_.numBatches);
+		if (options_.numBatches == 0)
+			std::cout << " (infinite)";
+		std::cout << "\n";
 		std::cout << "Batch Size: " << PadWrite(options_.batchSize) << "\n";
-		std::cout << "Max States: " << PadWrite(options_.maxStates) << "\n";
-		std::cout << "Solvers:    " << PadWrite(static_cast<u32>(options_.numSolvers)) << ")\n";
+		std::cout << "Max States: " << PadWrite(options_.maxStates);
+		if (options_.maxStates == 0)
+			std::cout << "(infinite)";
+		std::cout << "\n";
+		std::cout << "Solvers:    " << PadWrite(static_cast<u32>(options_.numSolvers));
+		if (options_.numSolvers == 0)
+			std::cout << " (deduced to " << numSolvers << ")";
+		std::cout << "\n";
 		std::cout << "Results directory: " << options_.outputDirectory << "\n";
 		std::cout << (options_.writeGameSolutions ? "Writing out game solutions.\n" : "Not writing out game solutions.\n");
 		std::cout << std::endl;
 	}
 
+
 	std::atomic<u32> seedsRun = 0;
-	Threadpool pool(options_.numSolvers);
-	std::vector<KlondikeSolver> solvers(options_.numSolvers, options_.maxStates);
+	Threadpool pool(numSolvers);
+	std::vector<KlondikeSolver> solvers(numSolvers, options_.maxStates);
 
 	std::vector<std::future<void>> threads;
-	threads.reserve(options_.numSolvers);
+	threads.reserve(numSolvers);
 
 	std::mutex updateResultsMutex;
 	std::vector<GameResult> workingResults, writingResults;
@@ -248,7 +264,7 @@ bool BatchRunner::run(bool printOptions) {
 	u64 seedIndex = options_.firstSeed;
 	bool doneBatch = false;
 	u64 lastSeedInBatch = seedIndex - 1;
-	for (u32 i = 0; i < options_.numBatches; ++i) {
+	for (u32 i = 0; i < numBatches; ++i) {
 		workingResults.reserve(options_.batchSize);
 		lastSeedInBatch += options_.batchSize;
 		doneBatch = false;
