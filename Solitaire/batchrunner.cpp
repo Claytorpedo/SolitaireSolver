@@ -171,69 +171,65 @@ namespace {
 		stats.wins += wins;
 		stats.losses += losses;
 		stats.unknown += unknown;
-		stats.endSeed += results.size();
 	}
 
-	void _batch_task(KlondikeSolver& solver, std::mutex& writeMutex, u64& seedIndex, u64 lastSeedInBatch, bool& doneBatch, GameResults& workingResults, std::atomic<u32>& seedsRun) {
-		u64 seedToRun = 0;
+	void _print_options(const BatchOptions& options, u32 numSolvers) {
+		std::cout << "Running batches with options:\n";
+		std::cout << "First seed: " << PadWrite(options.firstSeed);
+		if (options.numBatches > 0 && options.seedFilePath.empty())
+			std::cout << " (last seed: " << (options.firstSeed + static_cast<u64>(options.batchSize) * options.numBatches - 1) << ")";
+		std::cout << "\n";
+		std::cout << "Batches:    " << PadWrite(options.numBatches);
+		if (options.numBatches == 0)
+			std::cout << " (infinite)";
+		std::cout << "\n";
+		std::cout << "Batch Size: " << PadWrite(options.batchSize) << "\n";
+		std::cout << "Max States: " << PadWrite(options.maxStates);
+		if (options.maxStates == 0)
+			std::cout << "(infinite)";
+		std::cout << "\n";
+		std::cout << "Solvers:    " << PadWrite(static_cast<u32>(options.numSolvers));
+		if (options.numSolvers == 0)
+			std::cout << " (deduced to " << numSolvers << ")";
+		std::cout << "\n";
+		std::cout << "Results directory: " << options.outputDirectory << "\n";
+		std::cout << (options.writeGameSolutions ? "Writing out game solutions.\n" : "Not writing out game solutions.\n");
+
+		if (!options.seedFilePath.empty()) {
+			std::cout << "Running from seed file: " << options.seedFilePath << "\n";
+		}
+
+		std::cout << std::endl;
+	}
+
+	void _batch_task(KlondikeSolver& solver, std::mutex& writeMutex, size_t& seedIndex, const std::vector<u64>& seeds, GameResults& workingResults, std::atomic<u32>& seedsRun) {
+		size_t seedToRunIndex = 0;
 		{
 			std::lock_guard<std::mutex> lock(writeMutex);
-			if (doneBatch)
-				return;
-			seedToRun = seedIndex++;
-			if (seedToRun == lastSeedInBatch) {
-				doneBatch = true;
-			}
+			seedToRunIndex = seedIndex++;
 		}
-		while (true) {
-			solver.setSeed(seedToRun);
+		while (seedToRunIndex < seeds.size()) {
+			solver.setSeed(seeds[seedToRunIndex]);
 			auto result = solver.solve();
 			++seedsRun;
 			{
 				std::lock_guard<std::mutex> lock(writeMutex);
 				workingResults.emplace_back(std::move(result));
-				if (doneBatch)
-					return;
-				seedToRun = seedIndex++;
-				if (seedToRun == lastSeedInBatch) {
-					doneBatch = true;
-				}
+				seedToRunIndex = seedIndex++;
 			}
 		}
 	}
 }
 
-bool BatchRunner::run(std::optional<std::string> seedFilePath, bool printOptions) {
+bool BatchRunner::run(bool printOptions) {
 	if (!_startup(options_.outputDirectory))
 		return false;
 
 	const unsigned int numSolvers = options_.numSolvers > 0 ? options_.numSolvers : std::thread::hardware_concurrency();
 	const u32 numBatches = options_.numBatches > 0 ? options_.numBatches : std::numeric_limits<u32>::max();
 
-	if (printOptions) {
-		std::cout << "Running batches with options:\n";
-		std::cout << "First seed: " << PadWrite(options_.firstSeed);
-		if (options_.numBatches > 0 )
-			std::cout << " (last seed: " << (options_.firstSeed + static_cast<u64>(options_.batchSize) * options_.numBatches - 1) << ")";
-		std::cout << "\n";
-		std::cout << "Batches:    " << PadWrite(options_.numBatches);
-		if (options_.numBatches == 0)
-			std::cout << " (infinite)";
-		std::cout << "\n";
-		std::cout << "Batch Size: " << PadWrite(options_.batchSize) << "\n";
-		std::cout << "Max States: " << PadWrite(options_.maxStates);
-		if (options_.maxStates == 0)
-			std::cout << "(infinite)";
-		std::cout << "\n";
-		std::cout << "Solvers:    " << PadWrite(static_cast<u32>(options_.numSolvers));
-		if (options_.numSolvers == 0)
-			std::cout << " (deduced to " << numSolvers << ")";
-		std::cout << "\n";
-		std::cout << "Results directory: " << options_.outputDirectory << "\n";
-		std::cout << (options_.writeGameSolutions ? "Writing out game solutions.\n" : "Not writing out game solutions.\n");
-		std::cout << std::endl;
-	}
-
+	if (printOptions)
+		_print_options(options_, numSolvers);
 
 	std::atomic<u32> seedsRun = 0;
 	Threadpool pool(numSolvers);
@@ -245,34 +241,77 @@ bool BatchRunner::run(std::optional<std::string> seedFilePath, bool printOptions
 	std::mutex updateResultsMutex;
 	std::vector<GameResult> workingResults, writingResults;
 
+	std::ifstream seedFile;
+	if (!options_.seedFilePath.empty()) {
+		seedFile.open(options_.seedFilePath);
+		if (!seedFile.is_open()) {
+			std::cerr << "BatchRunner::run: Failed to open seed file.\n";
+			return false;
+		}
+	}
+
+	u64 batchStartSeed = options_.firstSeed;
+	auto populateSeeds = [options = options_, &batchStartSeed, &seedFile] (std::vector<u64>& seeds, bool firstTime = false) {
+		seeds.reserve(options.batchSize);
+		if (!options.seedFilePath.empty()) {
+			size_t i = 0;
+			u64 seed;
+			if (firstTime) {
+				// Find the first seed.
+				while (seedFile >> seed) {
+					if (seed == options.firstSeed) {
+						seeds.push_back(seed);
+						++i;
+						break;
+					}
+				}
+			}
+			while (i++ < options.batchSize && seedFile >> seed)
+				seeds.push_back(seed);
+		} else {
+			const u64 batchEnd = batchStartSeed + options.batchSize;
+			while (batchStartSeed < batchEnd)
+				seeds.push_back(batchStartSeed++);
+		}
+	};
+
 	Stats stats;
 	stats.startSeed = options_.firstSeed;
-	stats.endSeed = options_.firstSeed - 1; // Still safe if first seed is 0. We'll just wrap back around.
 
 	const auto timeStart = Clock::now();
-	auto writeResults = [options = options_, timeStart, &stats, &writingResults] {
+
+	std::vector<u64> batchSeeds, tempBatchSeeds;
+
+	auto writeResults = [options = options_, timeStart, &stats, &writingResults, &batchSeeds] {
 		if (!writingResults.empty()) {
 			std::sort(writingResults.begin(), writingResults.end(), [](const auto& lhs, const auto& rhs) { return lhs.seed < rhs.seed; });
+
 			_write_results(writingResults, options.outputDirectory, options.writeGameSolutions);
+
 			_update_stats(writingResults, stats);
 			stats.runTime = std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - timeStart);
 			_write_stats(options.outputDirectory, stats);
+
 			writingResults.clear();
 		}
 	};
 
-	u64 seedIndex = options_.firstSeed;
-	bool doneBatch = false;
-	u64 lastSeedInBatch = seedIndex - 1;
-	for (u32 i = 0; i < numBatches; ++i) {
+	populateSeeds(tempBatchSeeds, true);
+	for (u32 i = 1; i <= numBatches && !tempBatchSeeds.empty(); ++i) {
+		// Initialize data and spawn tasks for solvers.
+		size_t seedIndex = 0;
+		batchSeeds = std::move(tempBatchSeeds);
+		tempBatchSeeds.clear();
 		workingResults.reserve(options_.batchSize);
-		lastSeedInBatch += options_.batchSize;
-		doneBatch = false;
+		stats.endSeed = batchSeeds.back();
 		for (auto& solver : solvers)
-			threads.push_back(pool.add(_batch_task, std::ref(solver), std::ref(updateResultsMutex), std::ref(seedIndex), lastSeedInBatch, std::ref(doneBatch), std::ref(workingResults), std::ref(seedsRun)));
+			threads.push_back(pool.add(_batch_task, std::ref(solver), std::ref(updateResultsMutex), std::ref(seedIndex), std::ref(batchSeeds), std::ref(workingResults), std::ref(seedsRun)));
 
+		// Output results, get seeds for next batch.
 		writeResults();
+		populateSeeds(tempBatchSeeds);
 
+		// Wait for solvers to finish batch.
 		while (!pool.isIdle()) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
 			std::cout << "\rSeeds Run: " << PadWrite<u32>(seedsRun);
@@ -282,7 +321,8 @@ bool BatchRunner::run(std::optional<std::string> seedFilePath, bool printOptions
 			thread.get();
 		threads.clear();
 
-		std::cout << "\nBatch done. Writing results.\n";
+		std::cout << "\nBatch " << i << " done. Writing results.\n";
+		// Move results so we can spawn new tasks before writing.
 		writingResults = std::move(workingResults);
 		workingResults.clear();
 	}
@@ -293,11 +333,11 @@ bool BatchRunner::run(std::optional<std::string> seedFilePath, bool printOptions
 	return true;
 }
 
-bool BatchRunner::writeDecks(const std::string& seedFilePath) const {
+bool BatchRunner::writeDecks() const {
 	if (!_startup(options_.outputDirectory))
 		return false;
 
-	std::ifstream seedFile(seedFilePath);
+	std::ifstream seedFile(options_.seedFilePath);
 	if (!seedFile.is_open()) {
 		std::cerr << "BatchRunner::writeDecks: Failed to open seed file.\n";
 		return false;

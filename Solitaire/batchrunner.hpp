@@ -17,6 +17,7 @@ namespace solitaire {
 
 		bool writeGameSolutions{ false };
 		std::string outputDirectory{ "./results/" };
+		std::string seedFilePath;
 	};
 
 	class BatchRunner {
@@ -27,8 +28,8 @@ namespace solitaire {
 		BatchOptions getOptions() const { return options_; }
 		void         setOptions(BatchOptions options) { options_ = std::move(options); }
 		// Returns false if there is an error.
-		bool         run(std::optional<std::string> seedFilePath = std::nullopt, bool printOptions = true);
-		bool         writeDecks(const std::string& seedFilePath) const;
+		bool         run(bool printOptions = true);
+		bool         writeDecks() const;
 
 	private:
 		BatchOptions options_;
