@@ -76,7 +76,6 @@ namespace solitaire {
 		u64 states_tried_ = 0;
 		std::unordered_set<std::string> seen_states_;
 
-		static const u8 SCRATCH_BUFF_SIZE = 40;
-		std::vector<uint8_t> id_scratch_space_ = std::vector<uint8_t>(SCRATCH_BUFF_SIZE);
+		static constexpr u8 UNIQUE_STATE_SIZE = 48;
 	};
 }
