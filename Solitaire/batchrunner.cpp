@@ -60,11 +60,11 @@ namespace {
 	};
 
 	bool _startup(const std::string& resultsDir) {
-		if (_mkdir(resultsDir.c_str()) != 0 && errno != EEXIST) {
+		if (::_mkdir(resultsDir.c_str()) != 0 && errno != EEXIST) {
 			std::cerr << "Failed to create results directory.\n";
 			return false;
 		}
-		if (_mkdir((resultsDir + std::string(SOLUTIONS_SUBFOLDER)).c_str()) != 0 && errno != EEXIST) {
+		if (::_mkdir((resultsDir + std::string(SOLUTIONS_SUBFOLDER)).c_str()) != 0 && errno != EEXIST) {
 			std::cerr << "Failed to create solutions directory.\n";
 			return false;
 		}
@@ -203,7 +203,7 @@ namespace {
 	}
 }
 
-bool BatchRunner::run(bool printOptions) {
+bool BatchRunner::run(std::optional<std::string> seedFilePath, bool printOptions) {
 	if (!_startup(options_.outputDirectory))
 		return false;
 
@@ -289,6 +289,33 @@ bool BatchRunner::run(bool printOptions) {
 	writeResults();
 	std::cout << "All batches completed.\n";
 	std::cout << "Time: " << stats.runTime.count() << " seconds\n";
+
+	return true;
+}
+
+bool BatchRunner::writeDecks(const std::string& seedFilePath) const {
+	if (!_startup(options_.outputDirectory))
+		return false;
+
+	std::ifstream seedFile(seedFilePath);
+	if (!seedFile.is_open()) {
+		std::cerr << "BatchRunner::writeDecks: Failed to open seed file.\n";
+		return false;
+	}
+	std::ofstream decksFile(options_.outputDirectory + "decks.txt", std::ios::app);
+	if (!decksFile.is_open()) {
+		std::cerr << "BatchRunner::writeDecks: Failed to open decks output file.\n";
+		return false;
+	}
+
+	u64 seed;
+	while (seedFile >> seed) {
+		const Deck deck = GenDeck(seed);
+		for (const Card& c : deck) {
+			decksFile << CardToStr(c) << ",";
+		}
+		decksFile << "\n";
+	}
 
 	return true;
 }

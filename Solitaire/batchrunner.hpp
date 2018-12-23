@@ -2,6 +2,7 @@
 
 #include "units.hpp"
 
+#include <optional>
 #include <string_view>
 
 // Batch runner for Solitaire Klondike. Runs batches of games and writes out results to disk.
@@ -26,7 +27,8 @@ namespace solitaire {
 		BatchOptions getOptions() const { return options_; }
 		void         setOptions(BatchOptions options) { options_ = std::move(options); }
 		// Returns false if there is an error.
-		bool         run(bool printOptions = true);
+		bool         run(std::optional<std::string> seedFilePath = std::nullopt, bool printOptions = true);
+		bool         writeDecks(const std::string& seedFilePath) const;
 
 	private:
 		BatchOptions options_;
