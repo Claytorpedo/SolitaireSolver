@@ -16,8 +16,9 @@ int main(int argc, const char* argv[]) {
 	parser.push(options.outputDirectory, 'o', "output-dir", "./results/", "Relative path to save output to.");
 	parser.push(options.seedFilePath, 'F', "seed-file", "", "Relative path to seed file. If set, searches for first seed and starts from there.");
 
-	bool writeDecks;
+	bool writeDecks, useNumericCards;
 	parser.pushFlag(writeDecks, std::nullopt, "write-decks", false, "Generate decks for all seeds in a seed file, and write them out to a deck file.");
+	parser.pushFlag(useNumericCards, std::nullopt, "use-numeric-cards", false, "Write decks option: print cards as numbers [1,52]. Order: hearts->diamons->clubs->spades.");
 
 	constexpr std::string_view description = "Solitaire Solver:\nAttempts to determine if Klondike games are winnable or not.";
 	if (!parser.parse(argc, argv) || showHelp) {
@@ -31,7 +32,7 @@ int main(int argc, const char* argv[]) {
 
 	solitaire::BatchRunner batchRunner(options);
 	if (writeDecks) {
-		return batchRunner.writeDecks() ? 0 : 1;
+		return batchRunner.writeDecks(useNumericCards) ? 0 : 1;
 	}
 
 	return batchRunner.run() ? 0 : 1;

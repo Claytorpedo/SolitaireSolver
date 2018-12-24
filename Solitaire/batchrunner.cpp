@@ -333,7 +333,7 @@ bool BatchRunner::run(bool printOptions) {
 	return true;
 }
 
-bool BatchRunner::writeDecks() const {
+bool BatchRunner::writeDecks(bool useNumericCards) const {
 	if (!_startup(options_.outputDirectory))
 		return false;
 
@@ -352,7 +352,11 @@ bool BatchRunner::writeDecks() const {
 	while (seedFile >> seed) {
 		const Deck deck = GenDeck(seed);
 		for (const Card& c : deck) {
-			decksFile << CardToStr(c) << ",";
+			if (useNumericCards)
+				decksFile << static_cast<u32>(toUType(c.getSuit()) * CARDS_PER_SUIT + c.getRank());
+			else
+				decksFile << CardToStr(c) << ",";
+			decksFile << " ";
 		}
 		decksFile << "\n";
 	}

@@ -29,7 +29,7 @@ namespace solitaire {
 		void         setOptions(BatchOptions options) { options_ = std::move(options); }
 		// Returns false if there is an error.
 		bool         run(bool printOptions = true);
-		bool         writeDecks() const;
+		bool         writeDecks(bool useNumericCards = false) const;
 
 	private:
 		BatchOptions options_;
