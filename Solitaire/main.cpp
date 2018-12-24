@@ -18,7 +18,7 @@ int main(int argc, const char* argv[]) {
 
 	bool writeDecks, useNumericCards;
 	parser.pushFlag(writeDecks, std::nullopt, "write-decks", false, "Generate decks for all seeds in a seed file, and write them out to a deck file.");
-	parser.pushFlag(useNumericCards, std::nullopt, "use-numeric-cards", false, "Write decks option: print cards as numbers [1,52]. Order: hearts->diamons->clubs->spades.");
+	parser.pushFlag(useNumericCards, std::nullopt, "use-numeric-cards", false, "Write decks option: print cards as numbers [1,52]. Order: hearts->diamonds->clubs->spades.");
 
 	constexpr std::string_view description = "Solitaire Solver:\nAttempts to determine if Klondike games are winnable or not.";
 	if (!parser.parse(argc, argv) || showHelp) {
