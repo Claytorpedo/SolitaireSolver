@@ -49,7 +49,7 @@ namespace solitaire {
 		static void MoveCard(Pile& from, s32 fromPosition, Pile& to, s32 toPosition=-1);
 
 	private:
-		Deck deck_;
 		PileType type_;
+		Deck deck_;
 	};
 }

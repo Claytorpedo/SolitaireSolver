@@ -72,26 +72,6 @@ namespace {
 		}
 		return false;
 	}
-	// See if a card (lower rank than King) has two spots on the tableau it can move onto.
-	bool _has_two_available_spots(const Card& card, const std::vector<Pile>& tableau, u8& firstSpot) {
-		if (card.getRank() == RANK_KING)
-			return false;
-		const bool wantedSuitIsBlack = IsRed(card.getSuit());
-		const Rank wantedRank = card.getRank() + 1;
-		bool foundOneSpot = false;
-		for (u8 i = 0; i < KlondikeGame::NUM_TABLEAU_PILES; ++i) {
-			if (tableau[i].hasCards()) {
-				const Card& c = tableau[i].getFromTop();
-				if (wantedSuitIsBlack && !IsRed(c.getSuit()) && wantedRank == c.getRank()) {
-					if (foundOneSpot)
-						return true;
-					firstSpot = i;
-					foundOneSpot = true;;
-				}
-			}
-		}
-		return false;
-	}
 	// See if there is room in the tableau for all the kings. If there is, return an empty spot to place a king in.
 	// This function "cheats", by peeking under flipped cards at the base of tableau piles.
 	bool _has_space_for_all_kings(const std::vector<Pile>& tableau, u8& emptySpot) {
@@ -112,7 +92,7 @@ namespace {
 		if (_guaranteed_move_to_foundation(c, game.foundation))
 			return std::make_unique<Move>(Move::Stock(c, game.getStockPosition(), testStockPosition, PileID{ PileType::FOUNDATION, toUType(c.getSuit()) }));
 		// Check if it's a king, and see if there are enough tableau spaces to guarantee it has room.
-		if (u8 emptySpot; c.getRank() == RANK_KING && _has_space_for_all_kings(game.tableau, emptySpot))
+		if (u8 emptySpot{ 0 }; c.getRank() == RANK_KING && _has_space_for_all_kings(game.tableau, emptySpot))
 			return std::make_unique<Move>(Move::Stock(c, game.getStockPosition(), testStockPosition, PileID{ PileType::TABLEAU, emptySpot }));
 		return nullptr;
 	}
@@ -161,7 +141,7 @@ std::unique_ptr<Move> KlondikeSolver::_find_auto_move() {
 		Card topOfRun;
 		_find_top_of_run(game_.tableau[i], runLength, &topOfRun);
 		if (!game_.tableau[i][0].isFaceUp() && topOfRun.getRank() == RANK_KING) { // Don't move a king that is already on an empty spot.
-			if (u8 emptySpot; _has_space_for_all_kings(game_.tableau, emptySpot))
+			if (u8 emptySpot{ 0 }; _has_space_for_all_kings(game_.tableau, emptySpot))
 				return std::make_unique<Move>(Move::Tableau(topOfRun, PileID{ PileType::TABLEAU, i }, PileID{ PileType::TABLEAU, emptySpot }, runLength, true));
 		}
 	}
