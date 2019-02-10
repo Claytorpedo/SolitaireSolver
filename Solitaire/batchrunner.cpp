@@ -1,21 +1,25 @@
 #include "batchrunner.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <iomanip>
 #include <iostream>
 #include <fstream>
 #include <numeric>
 #include <mutex>
-#include <string>
 #include <sstream>
+#include <string>
 #include <vector>
-#include <chrono>
 
 #include "KlondikeSolver.hpp"
 #include "threadpool/threadpool/Threadpool.hpp"
 
+#ifdef _WIN32
 #include <direct.h>
 #include <errno.h>
+#else
+#include <cstdlib>
+#endif
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -60,6 +64,7 @@ namespace {
 	};
 
 	bool _startup(const std::string& resultsDir) {
+#ifdef _WIN32
 		if (::_mkdir(resultsDir.c_str()) != 0 && errno != EEXIST) {
 			std::cerr << "Failed to create results directory.\n";
 			return false;
@@ -68,6 +73,12 @@ namespace {
 			std::cerr << "Failed to create solutions directory.\n";
 			return false;
 		}
+#else
+		if (std::string cmd = "mkdir -p " + resultsDir + std::string(SOLUTIONS_SUBFOLDER); system(cmd.c_str()) == -1) {
+			std::cerr << "Failed to create output directory.\n";
+			return false;
+		}
+#endif
 		return true;
 	}
 
