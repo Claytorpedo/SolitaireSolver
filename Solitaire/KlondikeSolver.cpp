@@ -354,9 +354,8 @@ GameResult::Result KlondikeSolver::_solve_recursive(u32 depth) {
 			if (false)
 				game_.printGame();
 
-			GameResult::Result r = _solve_recursive(depth + 1);
-			if (r != GameResult::Result::LOSE)
-				return r;
+			if (auto result = _solve_recursive(depth + 1); result != GameResult::Result::LOSE)
+				return result;
 
 			_undo_move(priMove.move);
 		}
